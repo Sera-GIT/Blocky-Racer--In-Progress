@@ -75,8 +75,7 @@
             try {
                 console.log("Requesting Bluetooth Device...");
                 const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true, 
-                    optionalServices: [SERVICE_UUID]
+                    filters: [{ services: [SERVICE_UUID] }]
                 });
         
                 device.addEventListener('gattserverdisconnected', onDisconnected);
@@ -348,4 +347,5 @@
 </body>
 
 </html>
+
 
