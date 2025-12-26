@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blocky Racer: Fixed Tilt + Vibe Debug v5</title>
+    <title>Blocky Racer: Polling Mode v6</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: Arial, sans-serif; }
         
@@ -40,6 +40,8 @@
         .test-btn.secondary:active { background: #e68900; }
         .test-btn.tertiary { background: #2196F3; }
         .test-btn.tertiary:active { background: #1976D2; }
+        .test-btn.calib { background: #9C27B0; }
+        .test-btn.calib:active { background: #7B1FA2; }
     </style>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -52,23 +54,24 @@
         <div><b>BLE STATUS:</b> <span id="st" class="status-disconnected">DISCONNECTED</span></div>
         <div><b>TILT VALUE:</b> <span id="tx">0.00</span></div>
         <div><b>STEERING:</b> <span id="act">CENTER</span></div>
-        <div><b>RECEIVED:</b> <span id="rcv">0</span> packets</div>
+        <div><b>PACKETS:</b> <span id="rcv">0</span></div>
         <hr style="border-color:#0f0;">
-        <div style="font-size:11px;"><b>VIBRATION DEBUG:</b></div>
-        <div><b>Status:</b> <span id="vibeStatus">Not tested</span></div>
-        <div><b>UUID Match:</b> <span id="uuidMatch">Unknown</span></div>
+        <div style="font-size:11px;"><b>VIBRATION (POLLING MODE):</b></div>
+        <div><b>Status:</b> <span id="vibeStatus">Ready</span></div>
         <div><b>Writes:</b> <span id="vibeCount">0</span></div>
-        <div><b>Error:</b> <span id="lastError" style="font-size:9px;">None</span></div>
-        <button id="testVibeBtn" class="test-btn">🔔 VIBE: Write Without Response</button>
-        <button id="testVibeBtn2" class="test-btn secondary">🔔 VIBE: Write With Response</button>
-        <button id="testVibeBtn3" class="test-btn secondary">🔔 VIBE: Multiple Bytes</button>
-        <button id="verifyCharBtn" class="test-btn tertiary">🔍 VERIFY CHARACTERISTIC</button>
+        <div><b>Last:</b> <span id="lastError" style="font-size:9px;">None</span></div>
+        <button id="calibBtn" class="test-btn calib">📍 CALIBRATE CONTROLLER</button>
+        <button id="testVibeBtn" class="test-btn">🔔 TEST VIBRATION</button>
+        <button id="readVibeBtn" class="test-btn secondary">📖 READ VIBE CHAR</button>
         <button id="reconnectBtn" class="test-btn tertiary" style="margin-top:8px;">🔄 RECONNECT</button>
         <hr style="border-color:#0f0;">
         <div style="font-size:9px; color:#888;">
-            <b>TILT:</b> Calibrated at startup<br>
-            <b>THRESHOLD:</b> ±50° from center<br>
-            <b>DEADZONE:</b> -50° to +50° = CENTER
+            <b>NEW SYSTEM:</b><br>
+            • Polling (no callbacks)<br>
+            • Pitch-based tilt (more stable)<br>
+            • Hysteresis (no jitter)<br>
+            • 45° to turn, 35° to release<br>
+            • Calibrate anytime from button
         </div>
     </div>
 
@@ -78,7 +81,6 @@
     <script type="text/babel">
         const { useEffect, useRef, useState } = React;
 
-        // Global debug update function
         window.updateDebug = (status, x, action) => {
             const stEl = document.getElementById('st');
             if(status && stEl) {
@@ -114,7 +116,6 @@
             const vibeCountRef = useRef(0);
             const reconnectAttempts = useRef(0);
             
-            // BLE State
             const btRef = useRef({ 
                 device: null, 
                 server: null, 
@@ -139,7 +140,6 @@
                 if (saved) setHighScore(parseInt(saved));
             }, []);
 
-            // Update debug display helpers
             const updateVibeStatus = (status, isSuccess) => {
                 const statusEl = document.getElementById('vibeStatus');
                 if (statusEl) {
@@ -159,15 +159,6 @@
                 if (errorEl) errorEl.innerText = error;
             };
 
-            const updateUUIDMatch = (match) => {
-                const el = document.getElementById('uuidMatch');
-                if (el) {
-                    el.innerText = match ? "✓ CORRECT" : "✗ MISMATCH";
-                    el.style.color = match ? "#0f0" : "#f00";
-                }
-            };
-
-            // Handle disconnect event
             const onDisconnected = () => {
                 console.log("⚠️ DEVICE DISCONNECTED");
                 setBtConnected(false);
@@ -176,7 +167,6 @@
                 window.updateDebug("DISCONNECTED", 0, "---");
                 updateVibeStatus("Disconnected", false);
                 
-                // Auto-reconnect attempt
                 if (reconnectAttempts.current < 3) {
                     reconnectAttempts.current++;
                     console.log(`🔄 Auto-reconnect attempt ${reconnectAttempts.current}/3...`);
@@ -184,7 +174,6 @@
                 }
             };
 
-            // Main Bluetooth connection function
             const connectBluetooth = async (isReconnect = false) => {
                 if (btRef.current.isConnecting) {
                     console.log("⏸️ Connection already in progress");
@@ -197,7 +186,6 @@
                     window.updateDebug("CONNECTING...", null, null);
                     console.log("🔍 Starting Bluetooth connection...");
                     
-                    // Request device
                     const device = isReconnect && btRef.current.device ? 
                         btRef.current.device : 
                         await navigator.bluetooth.requestDevice({
@@ -206,33 +194,23 @@
                         });
                     
                     console.log("✓ Device selected:", device.name);
-                    
-                    // Add disconnect listener
                     device.addEventListener('gattserverdisconnected', onDisconnected);
                     
-                    // Connect to GATT server
-                    console.log("🔌 Connecting to GATT server...");
+                    console.log("🔌 Connecting to GATT...");
                     const server = await device.gatt.connect();
                     console.log("✓ GATT connected!");
                     
                     await new Promise(resolve => setTimeout(resolve, 200));
                     
-                    // Get service
-                    console.log("📡 Getting primary service...");
                     const service = await server.getPrimaryService(SERVICE_UUID);
                     console.log("✓ Service acquired!");
                     
-                    // Get sensor characteristic
-                    console.log("📊 Getting sensor characteristic...");
                     const sensorChar = await service.getCharacteristic(SENSOR_CHAR_UUID);
-                    console.log("✓ Sensor characteristic ready!");
+                    console.log("✓ Sensor char ready!");
                     
-                    // Start notifications
-                    console.log("🔔 Starting notifications...");
                     await sensorChar.startNotifications();
                     console.log("✓ Notifications enabled!");
                     
-                    // Set up data handler
                     sensorChar.addEventListener('characteristicvaluechanged', (event) => {
                         try {
                             const val = event.target.value.getFloat32(0, true);
@@ -244,62 +222,28 @@
                                 const rcvEl = document.getElementById('rcv');
                                 if (rcvEl) rcvEl.innerText = packetCountRef.current;
                                 
-                                // FIXED: Calibrated system - only ±3.0 or 0.0
-                                let action = "CENTER (deadzone)";
+                                let action = "CENTER";
                                 if (val >= 2.8) action = "RIGHT ➡️";
                                 else if (val <= -2.8) action = "LEFT ⬅️";
                                 
                                 window.updateDebug(null, val, action);
                             }
                         } catch (err) {
-                            console.error("❌ Error processing sensor data:", err);
+                            console.error("❌ Sensor data error:", err);
                         }
                     });
                     
-                    // Get vibration characteristic with EXTENSIVE debugging
                     console.log("📳 Getting vibration characteristic...");
                     const vibeChar = await service.getCharacteristic(VIBE_CHAR_UUID);
-                    console.log("✓ Vibration characteristic acquired!");
+                    console.log("✓ Vibe char acquired!");
                     
-                    // Verify UUID
-                    const actualUUID = vibeChar.uuid.toLowerCase();
-                    const expectedUUID = VIBE_CHAR_UUID.toLowerCase();
-                    const uuidMatches = actualUUID === expectedUUID;
+                    console.log("╔═══════════════════════════════════════╗");
+                    console.log("║  VIBRATION: POLLING MODE              ║");
+                    console.log("║  • Arduino polls characteristic       ║");
+                    console.log("║  • Write any byte to trigger vibe     ║");
+                    console.log("║  • Write 'C' to calibrate             ║");
+                    console.log("╚═══════════════════════════════════════╝");
                     
-                    console.log("╔═══════════════════════════════════════════╗");
-                    console.log("║  VIBRATION CHARACTERISTIC DEBUG           ║");
-                    console.log("╠═══════════════════════════════════════════╣");
-                    console.log("║  Expected UUID:", expectedUUID);
-                    console.log("║  Actual UUID:  ", actualUUID);
-                    console.log("║  Match:", uuidMatches ? "✓" : "✗");
-                    
-                    const props = vibeChar.properties;
-                    console.log("║  Properties:");
-                    console.log("║    write:", props.write);
-                    console.log("║    writeWithoutResponse:", props.writeWithoutResponse);
-                    console.log("║    read:", props.read);
-                    console.log("║    notify:", props.notify);
-                    console.log("╚═══════════════════════════════════════════╝");
-                    
-                    updateUUIDMatch(uuidMatches);
-                    
-                    // Try to subscribe to notifications if available
-                    if (props.notify) {
-                        try {
-                            console.log("📢 Subscribing to vibe char notifications...");
-                            await vibeChar.startNotifications();
-                            vibeChar.addEventListener('characteristicvaluechanged', (event) => {
-                                console.log("🔔 Vibe char notification received!");
-                                const val = event.target.value.getUint8(0);
-                                console.log("   Value:", val);
-                            });
-                            console.log("✓ Subscribed to vibe notifications!");
-                        } catch (e) {
-                            console.warn("⚠️ Could not subscribe to vibe notifications:", e.message);
-                        }
-                    }
-                    
-                    // Store everything
                     btRef.current = { 
                         device, 
                         server, 
@@ -313,14 +257,12 @@
                     setBtConnecting(false);
                     reconnectAttempts.current = 0;
                     window.updateDebug("CONNECTED", 0, "CENTER");
-                    updateVibeStatus("Ready - Use test buttons", true);
+                    updateVibeStatus("Ready", true);
                     
-                    console.log("╔═══════════════════════════════════╗");
-                    console.log("║  ✅ CONNECTION SUCCESSFUL!       ║");
-                    console.log("╚═══════════════════════════════════╝");
+                    console.log("✅ CONNECTION SUCCESSFUL!");
                     
                 } catch (error) {
-                    console.error("❌ BLUETOOTH CONNECTION ERROR:", error);
+                    console.error("❌ CONNECTION ERROR:", error);
                     btRef.current.isConnecting = false;
                     setBtConnecting(false);
                     setBtConnected(false);
@@ -330,173 +272,116 @@
                 }
             };
 
-            // Verify characteristic details
-            const verifyCharacteristic = () => {
+            // Send calibration command
+            const sendCalibration = async () => {
                 if (!btRef.current.vibeChar) {
                     alert("Not connected!");
                     return;
                 }
                 
-                const char = btRef.current.vibeChar;
-                const props = char.properties;
-                
-                const info = `
-VIBRATION CHARACTERISTIC DETAILS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-UUID: ${char.uuid}
-Expected: ${VIBE_CHAR_UUID}
-Match: ${char.uuid.toLowerCase() === VIBE_CHAR_UUID.toLowerCase() ? '✓ YES' : '✗ NO'}
-
-PROPERTIES:
-• write: ${props.write ? '✓' : '✗'}
-• writeWithoutResponse: ${props.writeWithoutResponse ? '✓' : '✗'}
-• read: ${props.read ? '✓' : '✗'}
-• notify: ${props.notify ? '✓' : '✗'}
-
-Check Serial Monitor for Arduino callback logs!
-                `;
-                
-                console.log(info);
-                alert(info);
-            };
-
-            // Method 1: writeValueWithoutResponse with detailed logging
-            const sendVibrationMethod1 = async () => {
-                if (!btRef.current.vibeChar) {
-                    updateVibeStatus("FAIL: Not connected", false);
-                    return false;
-                }
-                
                 try {
                     console.log("\n╔═══════════════════════════════════════╗");
-                    console.log("║  🧪 VIBRATION TEST: Method 1          ║");
-                    console.log("║  writeValueWithoutResponse([1])       ║");
+                    console.log("║  📍 SENDING CALIBRATION COMMAND       ║");
                     console.log("╚═══════════════════════════════════════╝");
                     
-                    const data = new Uint8Array([1]);
-                    console.log("→ Sending:", Array.from(data));
-                    console.log("→ Time:", new Date().toISOString());
-                    
+                    // Send 'C' character
+                    const data = new Uint8Array([67]); // ASCII 'C'
                     await btRef.current.vibeChar.writeValueWithoutResponse(data);
                     
-                    console.log("✅ Write completed (no response expected)");
-                    console.log("⏰ Check Arduino Serial Monitor NOW!");
-                    console.log("   Should see: '🔔 VIBE CALLBACK TRIGGERED'");
+                    console.log("✅ Calibration command sent!");
+                    console.log("⏰ Arduino should buzz and recalibrate NOW");
+                    console.log("   Check Serial Monitor for confirmation");
                     
-                    updateVibeStatus("Method 1 sent - Check Serial!", true);
-                    updateVibeCount();
+                    updateVibeStatus("Calibrating...", true);
                     updateLastError("None");
-                    return true;
+                    
+                    setTimeout(() => {
+                        updateVibeStatus("Calibration sent - Check Serial!", true);
+                    }, 2000);
+                    
                 } catch (err) {
-                    console.error("❌ Method 1 failed:", err);
+                    console.error("❌ Calibration failed:", err);
                     updateVibeStatus("FAIL: " + err.message, false);
                     updateLastError(err.message);
-                    return false;
                 }
             };
 
-            // Method 2: writeValue (with response)
-            const sendVibrationMethod2 = async () => {
+            // Test vibration
+            const sendVibration = async (fromCrash = false) => {
                 if (!btRef.current.vibeChar) {
-                    updateVibeStatus("FAIL: Not connected", false);
-                    return false;
+                    console.error("❌ Not connected");
+                    return;
+                }
+                
+                if (!fromCrash && vibeTimeoutRef.current) {
+                    console.log("⏸️ Cooldown active");
+                    return;
                 }
                 
                 try {
-                    console.log("\n╔═══════════════════════════════════════╗");
-                    console.log("║  🧪 VIBRATION TEST: Method 2          ║");
-                    console.log("║  writeValue([1]) - with response      ║");
-                    console.log("╚═══════════════════════════════════════╝");
+                    const source = fromCrash ? "CRASH" : "TEST";
+                    console.log(`\n🔔 VIBRATION [${source}]`);
                     
+                    // Send byte value 1
                     const data = new Uint8Array([1]);
-                    console.log("→ Sending:", Array.from(data));
+                    await btRef.current.vibeChar.writeValueWithoutResponse(data);
                     
-                    await btRef.current.vibeChar.writeValue(data);
+                    console.log("✅ Vibration byte sent!");
+                    console.log("⏰ Arduino should activate motor NOW");
+                    console.log("   Check Serial Monitor for 'VIBRATION COMMAND RECEIVED'");
                     
-                    console.log("✅ Write completed (with response)");
-                    console.log("⏰ Check Arduino Serial Monitor NOW!");
-                    
-                    updateVibeStatus("Method 2 sent - Check Serial!", true);
+                    updateVibeStatus("Vibe sent - Check motor!", true);
                     updateVibeCount();
                     updateLastError("None");
-                    return true;
+                    
+                    if (!fromCrash) {
+                        vibeTimeoutRef.current = setTimeout(() => {
+                            vibeTimeoutRef.current = null;
+                        }, 1000);
+                    }
+                    
                 } catch (err) {
-                    console.error("❌ Method 2 failed:", err);
+                    console.error("❌ Vibration failed:", err);
                     updateVibeStatus("FAIL: " + err.message, false);
                     updateLastError(err.message);
-                    return false;
                 }
             };
 
-            // Method 3: Multiple bytes
-            const sendVibrationMethod3 = async () => {
+            // Read current value of vibe characteristic
+            const readVibeChar = async () => {
                 if (!btRef.current.vibeChar) {
-                    updateVibeStatus("FAIL: Not connected", false);
-                    return false;
+                    alert("Not connected!");
+                    return;
                 }
                 
                 try {
-                    console.log("\n╔═══════════════════════════════════════╗");
-                    console.log("║  🧪 VIBRATION TEST: Method 3          ║");
-                    console.log("║  writeValue([1,2,3,4])                ║");
-                    console.log("╚═══════════════════════════════════════╝");
+                    console.log("\n📖 READING VIBE CHARACTERISTIC...");
                     
-                    const data = new Uint8Array([1, 2, 3, 4]);
-                    console.log("→ Sending:", Array.from(data));
+                    const value = await btRef.current.vibeChar.readValue();
+                    const byteArray = new Uint8Array(value.buffer);
                     
-                    await btRef.current.vibeChar.writeValue(data);
+                    console.log("Current value:");
+                    console.log("  Length:", byteArray.length);
+                    console.log("  Bytes:", Array.from(byteArray));
+                    console.log("  First byte:", byteArray[0]);
                     
-                    console.log("✅ Write completed");
-                    console.log("⏰ Check Arduino Serial Monitor NOW!");
+                    alert(`Vibe Char Value:\nLength: ${byteArray.length}\nBytes: [${Array.from(byteArray)}]\nFirst byte: ${byteArray[0]}\n\nShould be 0 when idle.`);
                     
-                    updateVibeStatus("Method 3 sent - Check Serial!", true);
-                    updateVibeCount();
-                    updateLastError("None");
-                    return true;
                 } catch (err) {
-                    console.error("❌ Method 3 failed:", err);
-                    updateVibeStatus("FAIL: " + err.message, false);
-                    updateLastError(err.message);
-                    return false;
+                    console.error("❌ Read failed:", err);
+                    alert("Read failed: " + err.message);
                 }
             };
 
-            // Auto-try all methods
-            const sendVibration = async () => {
-                console.log("💥 Crash vibration requested...");
-                
-                if (!btRef.current.vibeChar) {
-                    console.error("❌ Vibration characteristic not available");
-                    return;
-                }
-                
-                if (vibeTimeoutRef.current) {
-                    console.log("⏸️ Vibration on cooldown");
-                    return;
-                }
-                
-                // Try method 1 (fastest)
-                const success = await sendVibrationMethod1();
-                
-                if (success) {
-                    vibeTimeoutRef.current = setTimeout(() => {
-                        vibeTimeoutRef.current = null;
-                    }, 1000);
-                }
-            };
-
-            // Set up button handlers
             useEffect(() => {
-                const testBtn1 = document.getElementById('testVibeBtn');
-                const testBtn2 = document.getElementById('testVibeBtn2');
-                const testBtn3 = document.getElementById('testVibeBtn3');
-                const verifyBtn = document.getElementById('verifyCharBtn');
+                const calibBtn = document.getElementById('calibBtn');
+                const testBtn = document.getElementById('testVibeBtn');
+                const readBtn = document.getElementById('readVibeBtn');
                 const reconnectBtn = document.getElementById('reconnectBtn');
                 
-                if (testBtn1) testBtn1.onclick = sendVibrationMethod1;
-                if (testBtn2) testBtn2.onclick = sendVibrationMethod2;
-                if (testBtn3) testBtn3.onclick = sendVibrationMethod3;
-                if (verifyBtn) verifyBtn.onclick = verifyCharacteristic;
+                if (calibBtn) calibBtn.onclick = sendCalibration;
+                if (testBtn) testBtn.onclick = () => sendVibration(false);
+                if (readBtn) readBtn.onclick = readVibeChar;
                 if (reconnectBtn) reconnectBtn.onclick = () => connectBluetooth(false);
             }, []);
 
@@ -512,8 +397,6 @@ Check Serial Monitor for Arduino callback logs!
             };
             
             const triggerRestart = () => {
-                console.log("🔄 Restarting game...");
-                
                 setGameOver(false); 
                 setScore(0); 
                 setNewRecord(false); 
@@ -631,7 +514,7 @@ Check Serial Monitor for Arduino callback logs!
                     }
                     if(keys['w']||keys['ArrowUp']) speed = Math.min(speed+0.025, 0.9); else speed = Math.max(speed-0.01, 0);
 
-                    // FIXED: Calibrated controller - only ±3.0 or 0.0
+                    // Hysteresis-based controller input
                     steerTarget = 0;
                     const tiltValue = btRef.current.tilt;
 
@@ -641,7 +524,7 @@ Check Serial Monitor for Arduino callback logs!
                     else if (keys['d'] || keys['ArrowRight']) {
                         steerTarget = 0.5;
                     } 
-                    // Controller sends ±3.0 only when tilted ±50°
+                    // With hysteresis: locks at ±3.0 until released
                     else if (tiltValue <= -2.8) {
                         steerTarget = -0.5;
                     } 
@@ -703,8 +586,8 @@ Check Serial Monitor for Arduino callback logs!
                         const distanceX = Math.abs(opp.mesh.position.x - playerCar.position.x);
                         
                         if (distanceZ < 4.0 && distanceX < 3.0) {
-                            console.log("💥💥💥 COLLISION!");
-                            sendVibration(); 
+                            console.log("💥 COLLISION!");
+                            sendVibration(true); 
                             setGameOver(true); 
                             gameStateRef.current.isGameOver = true; 
                             
@@ -768,7 +651,7 @@ Check Serial Monitor for Arduino callback logs!
                     {!gameStarted && (
                         <div id="overlayScreen">
                             <h1 style={{fontSize:'80px', margin:0, color:'#4CAF50', textShadow:'4px 4px 0 #000'}}>BLOCKY RACER</h1>
-                            <p style={{fontSize:'24px', opacity:0.8}}>Calibrated Edition v5.0</p>
+                            <p style={{fontSize:'24px', opacity:0.8}}>Polling Mode v6.0</p>
                             <p style={{marginTop:'20px', fontSize:'18px'}}>High Score: {highScore}</p>
                             <button 
                                 className={`bt-btn ${btConnected?'connected':btConnecting?'connecting':''}`} 
