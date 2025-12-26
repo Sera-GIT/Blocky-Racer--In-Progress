@@ -340,16 +340,25 @@
                     // Roll-based steering with hysteresis zones
                     // ESP32 sends: -5 (Left), 0 (Center), 5 (Right)
                  // --- TARGET steering (slow + deliberate) ---
+                    // --- TARGET steering (slow + deliberate) ---
                     steerTarget = 0;
-                    // Keyboard fallback
-                    if (keys['a'] || keys['ArrowLeft']) steerTarget = -0.4;
-                    else if (keys['d'] || keys['ArrowRight']) steerTarget = 0.4;
                     
-                    // ESP32 discrete steering
-                    else if (tilt === -5) steerTarget = -0.4;
-                    else if (tilt === 5)  steerTarget = 0.4;
-                    
-                    // 2. Smooth steering (low-pass filter)
+                    // 1. Inputs (Prioritize Keyboard, then Bluetooth)
+                    if (keys['a'] || keys['ArrowLeft']) {
+                        steerTarget = -0.4;
+                    } 
+                    else if (keys['d'] || keys['ArrowRight']) {
+                        steerTarget = 0.4;
+                    } 
+                    // This is the fix for your IMU values (-3.0 to 3.0)
+                    else if (tilt < -1.0) {
+                        steerTarget = -0.4; 
+                    } 
+                    else if (tilt > 1.0) {
+                        steerTarget = 0.4;
+                    }
+
+                                    // 2. Smooth steering (low-pass filter)
                     steerCurrent += (steerTarget - steerCurrent) * 0.08;
                     
                     // 3. Apply movement with bounds
@@ -466,6 +475,7 @@
     </script>
 </body>
 </html>
+
 
 
 
