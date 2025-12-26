@@ -45,6 +45,11 @@
 
     <script type="text/babel">
         const { useEffect, useRef, useState } = React;
+        const hideLoader = () => {
+          const l = document.getElementById('loader');
+          if (l) {
+            l.style.opacity = 0;
+            setTimeout(() => l.style.display = 'none', 500); }};
 
         window.updateDebug = (status, x) => {
             if(status) document.getElementById('st').innerText = status;
@@ -456,6 +461,7 @@
     </script>
 </body>
 </html>
+
 
 
 
