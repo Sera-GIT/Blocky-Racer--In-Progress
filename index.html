@@ -93,7 +93,7 @@
                 }
             
                 try {
-                  await btRef.current.vibeChar.writeValue(
+                  await btRef.current.vibeChar.writeValueWithoutResponse(
                     new Uint8Array([1])
                   );
                   console.log("✓ TEST VIBE SENT!");
@@ -133,13 +133,9 @@
                                 
              sensorChar.addEventListener('characteristicvaluechanged', (event) => {
                   const dataView = event.target.value;
-                  let text = "";
-                
-                  for (let i = 0; i < dataView.byteLength; i++) {
-                    text += String.fromCharCode(dataView.getUint8(i));
-                  }
-                
-                  const val = parseFloat(text);
+                  const val = event.target.value.getFloat32(0, true);
+                btRef.current.tilt = val;
+                window.updateDebug(null, val);
                 
                   if (!isNaN(val)) {
                     btRef.current.tilt = val;
@@ -199,7 +195,7 @@
                 
                   isVibratingRef.current = true;
                   try {
-                    await btRef.current.vibeChar.writeValue(
+                    await btRef.current.vibeChar.writeValueWithoutResponse(
                       new Uint8Array([1])
                     );
                     console.log("✅ Vibe sent");
@@ -469,6 +465,7 @@
     </script>
 </body>
 </html>
+
 
 
 
