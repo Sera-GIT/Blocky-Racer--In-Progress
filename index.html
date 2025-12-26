@@ -83,18 +83,23 @@
             useEffect(() => {
                 window.manualVibe = async () => {
                     if (btRef.current.vibeChar) {
-                        console.log("SENDING MANUAL VIBE...");
+                        console.log("═══════════════════════════════");
+                        console.log("   MANUAL TEST VIBRATION");
+                        console.log("═══════════════════════════════");
                         try {
-                            const encoder = new TextEncoder('utf-8');
+                            const data = new Uint8Array([1]);
                             if (btRef.current.vibeChar.properties.writeWithoutResponse) {
-                                await btRef.current.vibeChar.writeValueWithoutResponse(encoder.encode('1'));
+                                await btRef.current.vibeChar.writeValueWithoutResponse(data);
                             } else {
-                                await btRef.current.vibeChar.writeValue(encoder.encode('1'));
+                                await btRef.current.vibeChar.writeValue(data);
                             }
-                            console.log("VIBE SENT!");
-                        } catch(e) { console.error("Manual Vibe Failed:", e); }
+                            console.log("✓ TEST VIBE SENT!");
+                        } catch(e) { 
+                            console.error("✗ Manual Vibe Failed:", e); 
+                        }
                     } else {
                         alert("Not connected to Controller!");
+                        console.error("No vibration characteristic available");
                     }
                 };
             }, [btConnected]);
