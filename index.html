@@ -125,7 +125,7 @@
                         let val = parseFloat(rawString);
                         if (!isNaN(val)) {
                             // Scale up for better Delta calculation
-                            btRef.current.tilt = val * 10; 
+                            btRef.current.tilt = val;
                         }
                     });
 
@@ -349,23 +349,25 @@
                     if(keys['w']||keys['ArrowUp']) speed = Math.min(speed+0.025, 0.9); else speed = Math.max(speed-0.01, 0);
 
                     // --- Y-AXIS MOTION DELTA LOGIC ---
-                    const THRESHOLD = 0.5;
-                    const currentY = btRef.current.tilt; 
+                    const THRESHOLD = 5;   // EXACTLY your requirement
+
+                    const currentY = btRef.current.tilt;
                     const prevY = prevTiltRef.current;
                     const delta = currentY - prevY;
-
+                    
                     let steer = 0;
-                    let actionText = "HOLD";
-
-                    if (delta > THRESHOLD) {
-                        steer = 0.5;
-                        actionText = "RIGHT >>";
-                    } else if (delta < -THRESHOLD) {
-                        steer = -0.5;
-                        actionText = "<< LEFT";
-                    } else {
-                        steer = 0;
+                    
+                    if (delta >= THRESHOLD) {
+                        steer = +0.5;   // RIGHT
                     }
+                    else if (delta <= -THRESHOLD) {
+                        steer = -0.5;   // LEFT
+                    }
+                    else {
+                        steer = 0;      // HOLD
+                    }
+                    
+                    prevTiltRef.current = currentY;
 
                     if (keys['a'] || keys['ArrowLeft']) steer = -0.5;
                     else if (keys['d'] || keys['ArrowRight']) steer = 0.5;
@@ -520,3 +522,4 @@
     </script>
 </body>
 </html>
+
