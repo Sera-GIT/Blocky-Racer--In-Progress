@@ -189,44 +189,41 @@
                 window.updateDebug("DISCONNECTED", 0);
             };
 
-            const sendVibration = async () => {
+           const sendVibration = async () => {
+                // 1. Safety Checks
                 if (!btRef.current.vibeChar) {
-                    console.error("⚠ Cannot vibrate - no characteristic!");
+                    console.error("📡 No vibration characteristic found!");
                     return;
                 }
-                
-                if (isVibratingRef.current) {
-                    console.log("⚠ Vibration already in progress, skipping");
-                    return;
-                }
-                
+                if (isVibratingRef.current) return; // Prevent spamming
+            
                 isVibratingRef.current = true;
-                
+            
                 try {
-                    console.log("╔══════════════════════════════╗");
-                    console.log("║   💥 CRASH! VIBRATING!      ║");
-                    console.log("╚══════════════════════════════╝");
+                    console.log("💥 CRASH DETECTED: Sending vibration...");
+                    const data = new Uint8Array([1]); // Raw byte 1
+            
+                    // 2. Try the modern 'Without Response' method (fastest)
+                    try {
+                        await btRef.current.vibeChar.writeValueWithoutResponse(data);
+                    } catch (e) {
+                        // 3. Fallback to standard write if 'Without Response' isn't supported
+                        await btRef.current.vibeChar.writeValue(data);
+                    }
                     
-                    const data = new Uint8Array([1]);
-                    await btRef.current.vibeChar.writeValue(data);
-                    
-                    console.log("✓ Vibration command sent successfully!");
-                } catch(e) { 
-                    console.error("╔══════════════════════════════╗");
-                    console.error("║  ✗ VIBRATION SEND FAILED!   ║");
-                    console.error("╚══════════════════════════════╝");
-                    console.error("Error:", e);
-                    
-                    // Try reconnecting
-                    if (e.message && e.message.includes('GATT')) {
-                        console.log("🔄 Attempting reconnect...");
+                    console.log("✅ Vibration signal sent!");
+                } catch (error) {
+                    console.error("❌ Bluetooth Write Failed:", error);
+                    // If GATT fails, we might need to reconnect
+                    if (error.message.includes('GATT')) {
                         setBtConnected(false);
                     }
                 }
-                
-                setTimeout(() => { 
-                    isVibratingRef.current = false; 
-                }, 1500);
+            
+                // 4. Reset flag after 1 second so we can vibrate again later
+                setTimeout(() => {
+                    isVibratingRef.current = false;
+                }, 1000);
             };
 
             const toggleMenu = () => { if (gameOver || !gameStarted) return; setMenuOpen(!menuOpen); gameStateRef.current.isPaused = !menuOpen; };
@@ -475,6 +472,7 @@
     </script>
 </body>
 </html>
+
 
 
 
