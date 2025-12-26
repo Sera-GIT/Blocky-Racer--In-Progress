@@ -107,15 +107,14 @@
                 };
             }, [btConnected]);
 
-           const connectBluetooth = async () => {
-            try {
-                window.updateDebug("SEARCHING...", null);
-                console.log("🔍 Starting Bluetooth scan...");
-                
-              const device = await navigator.bluetooth.requestDevice({
-    acceptAllDevices: true
-});
-                
+               const connectBluetooth = async () => {
+                try {
+                    window.updateDebug("SEARCHING...", null);
+                    console.log("🔍 Starting Bluetooth scan...");
+                    
+                const device = await navigator.bluetooth.requestDevice({
+        filters: [{ services: ["19b10000-e8f2-537e-4f6c-d104768a1214"]}]
+    });            
                 console.log("✓ Device selected:", device.name);
        
                 device.addEventListener('gattserverdisconnected', onDisconnected);
@@ -461,6 +460,7 @@
     </script>
 </body>
 </html>
+
 
 
 
