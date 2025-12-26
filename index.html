@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blocky Racer: Polling Mode v6</title>
+    <title>Blocky Racer</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: Arial, sans-serif; }
         
@@ -23,6 +23,7 @@
         
         #loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: white; display: flex; justify-content: center; align-items: center; z-index: 999; transition: opacity 0.5s; }
         #hud { position: absolute; top: 20px; right: 20px; color: white; text-shadow: 2px 2px 4px #000; z-index: 10; pointer-events: none; text-align: right; }
+        #lives { position: absolute; bottom: 20px; left: 20px; color: white; text-shadow: 2px 2px 4px #000; z-index: 10; pointer-events: none; font-size: 32px; font-weight: bold; }
         #menuBtn { position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.6); color: white; border: 2px solid white; padding: 10px 20px; font-size: 18px; font-weight: bold; cursor: pointer; z-index: 20; border-radius: 5px; pointer-events: auto; }
         #sideMenu { position: absolute; top: 0; right: -350px; width: 300px; height: 100%; background: rgba(0,0,0,0.95); color: white; z-index: 100; padding: 30px; box-sizing: border-box; transition: right 0.3s ease-out; display: flex; flex-direction: column; border-left: 2px solid #444; }
         #sideMenu.open { right: 0; }
@@ -42,6 +43,7 @@
         .test-btn.tertiary:active { background: #1976D2; }
         .test-btn.calib { background: #9C27B0; }
         .test-btn.calib:active { background: #7B1FA2; }
+        .reset-score-btn { padding: 10px 30px; font-size: 16px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
     </style>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
@@ -56,23 +58,13 @@
         <div><b>STEERING:</b> <span id="act">CENTER</span></div>
         <div><b>PACKETS:</b> <span id="rcv">0</span></div>
         <hr style="border-color:#0f0;">
-        <div style="font-size:11px;"><b>VIBRATION (POLLING MODE):</b></div>
+        <div style="font-size:11px;"><b>VIBRATION:</b></div>
         <div><b>Status:</b> <span id="vibeStatus">Ready</span></div>
         <div><b>Writes:</b> <span id="vibeCount">0</span></div>
         <div><b>Last:</b> <span id="lastError" style="font-size:9px;">None</span></div>
-        <button id="calibBtn" class="test-btn calib">📍 CALIBRATE CONTROLLER</button>
-        <button id="testVibeBtn" class="test-btn">🔔 TEST VIBRATION</button>
-        <button id="readVibeBtn" class="test-btn secondary">📖 READ VIBE CHAR</button>
+        <button id="calibBtn" class="test-btn calib">📍 CALIBRATE</button>
+        <button id="testVibeBtn" class="test-btn">🔔 TEST VIBE</button>
         <button id="reconnectBtn" class="test-btn tertiary" style="margin-top:8px;">🔄 RECONNECT</button>
-        <hr style="border-color:#0f0;">
-        <div style="font-size:9px; color:#888;">
-            <b>NEW SYSTEM:</b><br>
-            • Polling (no callbacks)<br>
-            • Pitch-based tilt (more stable)<br>
-            • Hysteresis (no jitter)<br>
-            • 45° to turn, 35° to release<br>
-            • Calibrate anytime from button
-        </div>
     </div>
 
     <div id="loader">Loading Assets...</div>
@@ -105,6 +97,7 @@
             const [gameOver, setGameOver] = useState(false);
             const [score, setScore] = useState(0);
             const [highScore, setHighScore] = useState(0);
+            const [lives, setLives] = useState(3);
             const [newRecord, setNewRecord] = useState(false);
             const [menuOpen, setMenuOpen] = useState(false);
             const [uiDifficulty, setUiDifficulty] = useState('Progressive');
@@ -120,13 +113,14 @@
                 device: null, 
                 server: null, 
                 sensorChar: null, 
-                vibeChar: null, 
+                vibeChar: null,
+                buttonChar: null,
                 tilt: 0,
                 isConnecting: false 
             });
             
             const gameStateRef = useRef({
-                isGameOver: false, isPaused: false, score: 0,
+                isGameOver: false, isPaused: false, score: 0, lives: 3,
                 movingTime: 0, totalDistance: 0, gridRows: [], opponents: [], difficulty: 'Progressive',
                 gameStarted: false
             });
@@ -134,6 +128,7 @@
             const SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
             const SENSOR_CHAR_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
             const VIBE_CHAR_UUID = "19b10002-e8f2-537e-4f6c-d104768a1214";
+            const BUTTON_CHAR_UUID = "19b10003-e8f2-537e-4f6c-d104768a1214";
 
             useEffect(() => {
                 const saved = localStorage.getItem('blockyRacerHighScore');
@@ -163,20 +158,25 @@
                 console.log("⚠️ DEVICE DISCONNECTED");
                 setBtConnected(false);
                 setBtConnecting(false);
-                btRef.current = { device: null, server: null, sensorChar: null, vibeChar: null, tilt: 0, isConnecting: false };
+                
+                // SAFE: Don't crash, just reset
+                if (btRef.current) {
+                    btRef.current.tilt = 0;
+                    btRef.current.device = null;
+                    btRef.current.server = null;
+                    btRef.current.sensorChar = null;
+                    btRef.current.vibeChar = null;
+                    btRef.current.buttonChar = null;
+                    btRef.current.isConnecting = false;
+                }
+                
                 window.updateDebug("DISCONNECTED", 0, "---");
                 updateVibeStatus("Disconnected", false);
-                
-                if (reconnectAttempts.current < 3) {
-                    reconnectAttempts.current++;
-                    console.log(`🔄 Auto-reconnect attempt ${reconnectAttempts.current}/3...`);
-                    setTimeout(() => connectBluetooth(true), 2000);
-                }
             };
 
             const connectBluetooth = async (isReconnect = false) => {
                 if (btRef.current.isConnecting) {
-                    console.log("⏸️ Connection already in progress");
+                    console.log("⏸️ Connection in progress");
                     return;
                 }
 
@@ -184,7 +184,6 @@
                     btRef.current.isConnecting = true;
                     setBtConnecting(true);
                     window.updateDebug("CONNECTING...", null, null);
-                    console.log("🔍 Starting Bluetooth connection...");
                     
                     const device = isReconnect && btRef.current.device ? 
                         btRef.current.device : 
@@ -193,23 +192,16 @@
                             optionalServices: [SERVICE_UUID]
                         });
                     
-                    console.log("✓ Device selected:", device.name);
+                    console.log("✓ Device:", device.name);
                     device.addEventListener('gattserverdisconnected', onDisconnected);
                     
-                    console.log("🔌 Connecting to GATT...");
                     const server = await device.gatt.connect();
-                    console.log("✓ GATT connected!");
-                    
                     await new Promise(resolve => setTimeout(resolve, 200));
                     
                     const service = await server.getPrimaryService(SERVICE_UUID);
-                    console.log("✓ Service acquired!");
                     
                     const sensorChar = await service.getCharacteristic(SENSOR_CHAR_UUID);
-                    console.log("✓ Sensor char ready!");
-                    
                     await sensorChar.startNotifications();
-                    console.log("✓ Notifications enabled!");
                     
                     sensorChar.addEventListener('characteristicvaluechanged', (event) => {
                         try {
@@ -229,26 +221,33 @@
                                 window.updateDebug(null, val, action);
                             }
                         } catch (err) {
-                            console.error("❌ Sensor data error:", err);
+                            console.error("Sensor data error:", err);
                         }
                     });
                     
-                    console.log("📳 Getting vibration characteristic...");
                     const vibeChar = await service.getCharacteristic(VIBE_CHAR_UUID);
-                    console.log("✓ Vibe char acquired!");
                     
-                    console.log("╔═══════════════════════════════════════╗");
-                    console.log("║  VIBRATION: POLLING MODE              ║");
-                    console.log("║  • Arduino polls characteristic       ║");
-                    console.log("║  • Write any byte to trigger vibe     ║");
-                    console.log("║  • Write 'C' to calibrate             ║");
-                    console.log("╚═══════════════════════════════════════╝");
+                    // NEW: Get button characteristic
+                    const buttonChar = await service.getCharacteristic(BUTTON_CHAR_UUID);
+                    await buttonChar.startNotifications();
+                    
+                    buttonChar.addEventListener('characteristicvaluechanged', (event) => {
+                        const val = event.target.value.getUint8(0);
+                        if (val === 1) {
+                            console.log("🔘 Button pressed - SPACE!");
+                            // Trigger restart if game over
+                            if (gameStateRef.current.isGameOver) {
+                                triggerRestart();
+                            }
+                        }
+                    });
                     
                     btRef.current = { 
                         device, 
                         server, 
                         sensorChar, 
-                        vibeChar, 
+                        vibeChar,
+                        buttonChar,
                         tilt: 0,
                         isConnecting: false
                     };
@@ -259,10 +258,10 @@
                     window.updateDebug("CONNECTED", 0, "CENTER");
                     updateVibeStatus("Ready", true);
                     
-                    console.log("✅ CONNECTION SUCCESSFUL!");
+                    console.log("✅ Connected!");
                     
                 } catch (error) {
-                    console.error("❌ CONNECTION ERROR:", error);
+                    console.error("❌ Connection error:", error);
                     btRef.current.isConnecting = false;
                     setBtConnecting(false);
                     setBtConnected(false);
@@ -272,7 +271,6 @@
                 }
             };
 
-            // Send calibration command
             const sendCalibration = async () => {
                 if (!btRef.current.vibeChar) {
                     alert("Not connected!");
@@ -280,57 +278,32 @@
                 }
                 
                 try {
-                    console.log("\n╔═══════════════════════════════════════╗");
-                    console.log("║  📍 SENDING CALIBRATION COMMAND       ║");
-                    console.log("╚═══════════════════════════════════════╝");
-                    
-                    // Send 'C' character
-                    const data = new Uint8Array([67]); // ASCII 'C'
+                    const data = new Uint8Array([67]); // 'C'
                     await btRef.current.vibeChar.writeValueWithoutResponse(data);
-                    
-                    console.log("✅ Calibration command sent!");
-                    console.log("⏰ Arduino should buzz and recalibrate NOW");
-                    console.log("   Check Serial Monitor for confirmation");
-                    
+                    console.log("✅ Calibration sent");
                     updateVibeStatus("Calibrating...", true);
-                    updateLastError("None");
-                    
-                    setTimeout(() => {
-                        updateVibeStatus("Calibration sent - Check Serial!", true);
-                    }, 2000);
-                    
                 } catch (err) {
                     console.error("❌ Calibration failed:", err);
                     updateVibeStatus("FAIL: " + err.message, false);
-                    updateLastError(err.message);
                 }
             };
 
-            // Test vibration
-            const sendVibration = async (fromCrash = false) => {
+            const sendVibration = async (fromCrash = false, duration = 400) => {
                 if (!btRef.current.vibeChar) {
                     console.error("❌ Not connected");
                     return;
                 }
                 
                 if (!fromCrash && vibeTimeoutRef.current) {
-                    console.log("⏸️ Cooldown active");
                     return;
                 }
                 
                 try {
-                    const source = fromCrash ? "CRASH" : "TEST";
-                    console.log(`\n🔔 VIBRATION [${source}]`);
-                    
-                    // Send byte value 1
                     const data = new Uint8Array([1]);
                     await btRef.current.vibeChar.writeValueWithoutResponse(data);
+                    console.log(`✅ Vibe sent (${duration}ms)`);
                     
-                    console.log("✅ Vibration byte sent!");
-                    console.log("⏰ Arduino should activate motor NOW");
-                    console.log("   Check Serial Monitor for 'VIBRATION COMMAND RECEIVED'");
-                    
-                    updateVibeStatus("Vibe sent - Check motor!", true);
+                    updateVibeStatus("Sent!", true);
                     updateVibeCount();
                     updateLastError("None");
                     
@@ -341,48 +314,39 @@
                     }
                     
                 } catch (err) {
-                    console.error("❌ Vibration failed:", err);
+                    console.error("❌ Vibe failed:", err);
                     updateVibeStatus("FAIL: " + err.message, false);
                     updateLastError(err.message);
                 }
             };
 
-            // Read current value of vibe characteristic
-            const readVibeChar = async () => {
-                if (!btRef.current.vibeChar) {
-                    alert("Not connected!");
-                    return;
-                }
-                
-                try {
-                    console.log("\n📖 READING VIBE CHARACTERISTIC...");
-                    
-                    const value = await btRef.current.vibeChar.readValue();
-                    const byteArray = new Uint8Array(value.buffer);
-                    
-                    console.log("Current value:");
-                    console.log("  Length:", byteArray.length);
-                    console.log("  Bytes:", Array.from(byteArray));
-                    console.log("  First byte:", byteArray[0]);
-                    
-                    alert(`Vibe Char Value:\nLength: ${byteArray.length}\nBytes: [${Array.from(byteArray)}]\nFirst byte: ${byteArray[0]}\n\nShould be 0 when idle.`);
-                    
-                } catch (err) {
-                    console.error("❌ Read failed:", err);
-                    alert("Read failed: " + err.message);
+            const resetHighScore = () => {
+                if (confirm("Reset high score to 0?")) {
+                    localStorage.setItem('blockyRacerHighScore', '0');
+                    setHighScore(0);
+                    alert("High score reset!");
                 }
             };
 
             useEffect(() => {
                 const calibBtn = document.getElementById('calibBtn');
                 const testBtn = document.getElementById('testVibeBtn');
-                const readBtn = document.getElementById('readVibeBtn');
                 const reconnectBtn = document.getElementById('reconnectBtn');
                 
                 if (calibBtn) calibBtn.onclick = sendCalibration;
                 if (testBtn) testBtn.onclick = () => sendVibration(false);
-                if (readBtn) readBtn.onclick = readVibeChar;
                 if (reconnectBtn) reconnectBtn.onclick = () => connectBluetooth(false);
+                
+                // SPACE BAR handler
+                const handleKeyPress = (e) => {
+                    if (e.code === 'Space' && gameStateRef.current.isGameOver) {
+                        e.preventDefault();
+                        triggerRestart();
+                    }
+                };
+                
+                window.addEventListener('keydown', handleKeyPress);
+                return () => window.removeEventListener('keydown', handleKeyPress);
             }, []);
 
             const toggleMenu = () => { 
@@ -397,8 +361,11 @@
             };
             
             const triggerRestart = () => {
+                console.log("🔄 Restarting...");
+                
                 setGameOver(false); 
                 setScore(0); 
+                setLives(3);
                 setNewRecord(false); 
                 setMenuOpen(false); 
                 setGameStarted(true);
@@ -407,6 +374,7 @@
                 ref.isGameOver = false; 
                 ref.isPaused = false; 
                 ref.score = 0; 
+                ref.lives = 3;
                 ref.movingTime = 0; 
                 ref.totalDistance = 0;
                 ref.gameStarted = true;
@@ -470,7 +438,7 @@
                 const createMultiBuilding=()=>{const g=new THREE.Group();const c=[0xE6E6FA,0xF5DEB3,0xFFB6C1,0x87CEFA,0x98FB98,0xD3D3D3][Math.floor(Math.random()*6)];const wm=new THREE.MeshLambertMaterial({color:0x333333});const dm=new THREE.MeshLambertMaterial({color:0x4A3627});const rm=new THREE.MeshLambertMaterial({color:0x8B4513});const h=new THREE.Group();const hw=new THREE.Mesh(new THREE.BoxGeometry(12,10,12),new THREE.MeshLambertMaterial({color:c}));hw.position.y=5;hw.castShadow=true;h.add(hw);const hr=new THREE.Mesh(new THREE.ConeGeometry(9,6,4),rm);hr.position.y=13;hr.rotation.y=Math.PI/4;h.add(hr);h.add(new THREE.Mesh(new THREE.BoxGeometry(3,6,0.5),dm).translateY(3).translateZ(6));h.add(new THREE.Mesh(new THREE.BoxGeometry(2.5,2.5,0.5),wm).translateY(6).translateX(-3.5).translateZ(6));h.add(new THREE.Mesh(new THREE.BoxGeometry(2.5,2.5,0.5),wm).translateY(6).translateX(3.5).translateZ(6));h.add(new THREE.Mesh(new THREE.BoxGeometry(2,4,2),new THREE.MeshLambertMaterial({color:0x555555})).translateY(13).translateX(3).translateZ(-3));g.add(h);const s=new THREE.Group();const sw=new THREE.Mesh(new THREE.BoxGeometry(14,45,14),new THREE.MeshLambertMaterial({color:0xaaaaaa}));sw.position.y=22.5;sw.castShadow=true;s.add(sw);for(let i=0;i<6;i++){const w=new THREE.Group();const wn=new THREE.Mesh(new THREE.BoxGeometry(3,4,0.5),wm);w.add(wn.clone().translateX(-4));w.add(wn.clone().translateX(4));w.position.set(0,5+i*6,7);s.add(w);}s.visible=false;g.add(s);const f=new THREE.Group();const fw=new THREE.Mesh(new THREE.BoxGeometry(18,12,18),new THREE.MeshLambertMaterial({color:0xCD5C5C}));fw.position.y=6;fw.castShadow=true;f.add(fw);f.add(new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,10,12),new THREE.MeshLambertMaterial({color:0x333333})).translateY(15).translateX(-5).translateZ(-5));f.add(new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,10,12),new THREE.MeshLambertMaterial({color:0x333333})).translateY(15).translateX(5));f.visible=false;g.add(f);const gl=new THREE.Group();const gw=new THREE.Mesh(new THREE.BoxGeometry(15,30,15),new THREE.MeshLambertMaterial({color:0x00CED1,transparent:true,opacity:0.8}));gw.position.y=15;gw.castShadow=true;gl.add(gw);for(let i=1;i<5;i++)gl.add(new THREE.Mesh(new THREE.BoxGeometry(14.5,0.5,14.5),new THREE.MeshLambertMaterial({color:0xffffff})).translateY(i*6));gl.visible=false;g.add(gl);return g;};
                 const createTree=()=>{const g=new THREE.Group();const t=Math.random();if(t<0.3){g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.7,2.5,6),new THREE.MeshLambertMaterial({color:0x3d2817})).translateY(1.25));const l=new THREE.Mesh(new THREE.ConeGeometry(3,7,8),new THREE.MeshLambertMaterial({color:0x1a472a}));l.position.y=5;l.castShadow=true;g.add(l);}else if(t<0.6){g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.6,3.5,6),new THREE.MeshLambertMaterial({color:0x5C4033})).translateY(1.75));const c=[0xFFB7C5,0xFF69B4,0xFFA500,0xFFFF00][Math.floor(Math.random()*4)];const l=new THREE.Mesh(new THREE.DodecahedronGeometry(2.8),new THREE.MeshLambertMaterial({color:c}));l.position.y=4.5;l.castShadow=true;g.add(l);}else{g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.7,3,6),new THREE.MeshLambertMaterial({color:0x8B4513})).translateY(1.5));const l=new THREE.Mesh(new THREE.SphereGeometry(3,7,7),new THREE.MeshLambertMaterial({color:0x228B22}));l.position.y=4;l.castShadow=true;g.add(l);}g.scale.set(1.3,1.3,1.3);return g;};
                 
-                const createCar=(t,c)=>{const g=new THREE.Group();const p=new THREE.MeshLambertMaterial({color:c});const gl=new THREE.MeshLambertMaterial({color:0x222222});const r=new THREE.MeshLambertMaterial({color:0x111111});const m=new THREE.MeshLambertMaterial({color:0x888888});const lr=new THREE.MeshLambertMaterial({color:0xff0000});const ly=new THREE.MeshLambertMaterial({color:0xffff00});const mb=(w,h,d,mt,x,y,z,rx=0)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mt);o.position.set(x,y,z);if(rx)o.rotation.x=rx;o.castShadow=true;g.add(o);};const mr=(rad,len,mt,x,y,z)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,len,16,1,false,0,Math.PI),mt);o.rotation.set(Math.PI/2,0,Math.PI/2);o.position.set(x,y,z);o.castShadow=true;g.add(o);};const ml=(mt,x,y,z)=>{const o=new THREE.Mesh(new THREE.SphereGeometry(0.2,8,8),mt);o.position.set(x,y,z);g.add(o);};const by=0.8;const wg=new THREE.CylinderGeometry(0.6,0.6,0.5,16);[[-1.2,1.2],[1.2,1.2],[-1.2,-1.2],[1.2,-1.2]].forEach(p=>{const w=new THREE.Mesh(wg,r);w.rotation.z=Math.PI/2;w.position.set(p[0],0.6,p[1]);w.castShadow=true;g.add(w);});if(t==='sport'){mb(2.4,0.8,4.2,p,0,by,0);mr(1.1,2.2,p,0,by+0.4,-0.3);mb(2.0,0.1,1.0,gl,0,by+0.65,0.6,-Math.PI/6);mb(2.4,0.2,0.6,p,0,by+0.7,-1.8);ml(ly,-0.8,by,2.2);ml(ly,0.8,by,2.2);ml(lr,-0.8,by+0.1,-2.2);ml(lr,0.8,by+0.1,-2.2);}else if(t==='ambulance'){mb(2.4,1.2,1.5,p,0,by+0.2,-1.7);mr(1.2,1.5,p,0,by+0.8,-1.7);mb(2.1,0.6,0.1,gl,0,by+0.9,-2.35,-Math.PI/12);mb(2.5,2.5,3.2,p,0,by+0.85,0.7);const wm=new THREE.MeshLambertMaterial({color:0xffffff});mb(0.5,1.4,0.1,wm,0,by+0.85,2.35);mb(1.4,0.5,0.1,wm,0,by+0.85,2.35);ml(ly,-0.9,by,-2.4);ml(ly,0.9,by,-2.4);ml(lr,-0.9,by+0.1,2.4);ml(lr,0.9,by+0.1,2.4);}else{const co=t==='police'?new THREE.MeshLambertMaterial({color:0x2196F3}):p;mb(2.4,1.0,4.0,co,0,by,0);mr(1.2,2.5,co,0,by+0.5,-0.2);mb(2.1,0.5,0.8,gl,0,by+0.6,0.6,-Math.PI/8);ml(ly,-0.8,by,2.1);ml(ly,0.8,by,2.1);ml(lr,-0.8,by+0.1,-2.1);ml(lr,0.8,by+0.1,-2.1);if(t==='police'){const b=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.15,0.25),m);b.position.set(0,by+1.75,-0.2);const rl=new THREE.Mesh(new THREE.SphereGeometry(0.2),lr);rl.position.x=-0.4;b.add(rl);const bl=new THREE.Mesh(new THREE.SphereGeometry(0.2),new THREE.MeshLambertMaterial({color:0x0000ff}));bl.position.x=0.4;b.add(bl);g.add(b);}}g.scale.set(1.4,1.4,1.4);return g;};
+                const createCar=(t,c)=>{const g=new THREE.Group();const p=new THREE.MeshLambertMaterial({color:c});const gl=new THREE.MeshLambertMaterial({color:0x222222});const r=new THREE.MeshLambertMaterial({color:0x111111});const m=new THREE.MeshLambertMaterial({color:0x888888});const lr=new THREE.MeshLambertMaterial({color:0xff0000});const ly=new THREE.MeshLambertMaterial({color:0xffff00});const mb=(w,h,d,mt,x,y,z,rx=0)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mt);o.position.set(x,y,z);if(rx)o.rotation.x=rx;o.castShadow=true;g.add(o);};const mr=(rad,len,mt,x,y,z)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,len,16,1,false,0,Math.PI),mt);o.rotation.set(Math.PI/2,0,Math.PI/2);o.position.set(x,y,z);o.castShadow=true;g.add(o);};const ml=(mt,x,y,z)=>{const o=new THREE.Mesh(new THREE.SphereGeometry(0.2,8,8),mt);o.position.set(x,y,z);g.add(o);};const by=0.8;const wg=new THREE.CylinderGeometry(0.6,0.6,0.5,16);[[-1.2,1.2],[1.2,1.2],[-1.2,-1.2],[1.2,-1.2]].forEach(p=>{const w=new THREE.Mesh(wg,r);w.rotation.z=Math.PI/2;w.position.set(p[0],0.6,p[1]);w.castShadow=true;g.add(w);});if(t==='sport'){mb(2.4,0.8,4.2,p,0,by,0);mr(1.1,2.2,p,0,by+0.4,-0.3);mb(2.0,0.1,1.0,gl,0,by+0.65,0.6,-Math.PI/6);mb(2.4,0.2,0.6,p,0,by+0.7,-1.8);ml(ly,-0.8,by,2.2);ml(ly,0.8,by,2.2);ml(lr,-0.8,by+0.1,-2.2);ml(lr,0.8,by+0.1,-2.2);}else if(t==='ambulance'){const white=new THREE.MeshLambertMaterial({color:0xffffff});mb(2.4,1.2,1.5,white,0,by+0.2,-1.7);mr(1.2,1.5,white,0,by+0.8,-1.7);mb(2.1,0.6,0.1,gl,0,by+0.9,-2.35,-Math.PI/12);mb(2.5,2.5,3.2,white,0,by+0.85,0.7);const red=new THREE.MeshLambertMaterial({color:0xff0000});mb(0.5,1.8,0.1,red,0,by+0.85,2.35);mb(1.8,0.5,0.1,red,0,by+0.85,2.35);ml(ly,-0.9,by,-2.4);ml(ly,0.9,by,-2.4);ml(lr,-0.9,by+0.1,2.4);ml(lr,0.9,by+0.1,2.4);}else if(t==='van'){mb(2.4,1.2,1.5,p,0,by+0.2,-1.7);mr(1.2,1.5,p,0,by+0.8,-1.7);mb(2.1,0.6,0.1,gl,0,by+0.9,-2.35,-Math.PI/12);mb(2.5,2.5,3.2,p,0,by+0.85,0.7);ml(ly,-0.9,by,-2.4);ml(ly,0.9,by,-2.4);ml(lr,-0.9,by+0.1,2.4);ml(lr,0.9,by+0.1,2.4);}else{const co=t==='police'?new THREE.MeshLambertMaterial({color:0x2196F3}):p;mb(2.4,1.0,4.0,co,0,by,0);mr(1.2,2.5,co,0,by+0.5,-0.2);mb(2.1,0.5,0.8,gl,0,by+0.6,0.6,-Math.PI/8);ml(ly,-0.8,by,2.1);ml(ly,0.8,by,2.1);ml(lr,-0.8,by+0.1,-2.1);ml(lr,0.8,by+0.1,-2.1);if(t==='police'){const b=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.15,0.25),m);b.position.set(0,by+1.75,-0.2);const rl=new THREE.Mesh(new THREE.SphereGeometry(0.2),lr);rl.position.x=-0.4;b.add(rl);const bl=new THREE.Mesh(new THREE.SphereGeometry(0.2),new THREE.MeshLambertMaterial({color:0x0000ff}));bl.position.x=0.4;b.add(bl);g.add(b);}}g.scale.set(1.4,1.4,1.4);return g;};
 
                 const playerCar = createCar('sport', 0xFF0055); scene.add(playerCar);
                 const road = new THREE.Mesh(new THREE.PlaneGeometry(30, 1000), new THREE.MeshLambertMaterial({ color: 0x444444 }));
@@ -504,35 +472,36 @@
                     if (speed > 0) { gameStateRef.current.movingTime += 0.016; gameStateRef.current.totalDistance += speed; }
                     const t = gameStateRef.current.movingTime; const diffMode = gameStateRef.current.difficulty;
 
-                    let laneSwitchProb = 0, spawnRate = 80;
+                    // LANE CHANGING: adjusted for difficulty
+                    let laneSwitchProb = 0, spawnRate = 80, laneChangeDistance = 80;
                     if (diffMode === 'Progressive') {
-                        if (t > 30 && t <= 60) { laneSwitchProb=0.005; spawnRate=60; }
-                        else if (t > 60) { laneSwitchProb=0.02; spawnRate=55; }
+                        if (t > 30 && t <= 60) { laneSwitchProb=0.002; spawnRate=60; laneChangeDistance=100; }
+                        else if (t > 60) { laneSwitchProb=0.008; spawnRate=55; laneChangeDistance=120; }
                     } else {
-                        if (diffMode === 'Medium') { laneSwitchProb=0.005; spawnRate=60; }
-                        else if (diffMode === 'Hard') { laneSwitchProb=0.02; spawnRate=55; }
+                        if (diffMode === 'Medium') { laneSwitchProb=0.002; spawnRate=60; laneChangeDistance=100; }
+                        else if (diffMode === 'Hard') { laneSwitchProb=0.008; spawnRate=55; laneChangeDistance=120; }
                     }
+                    
                     if(keys['w']||keys['ArrowUp']) speed = Math.min(speed+0.025, 0.9); else speed = Math.max(speed-0.01, 0);
 
-                    // Hysteresis-based controller input
+                    // REDUCED STEERING SENSITIVITY - car moves less
                     steerTarget = 0;
                     const tiltValue = btRef.current.tilt;
 
                     if (keys['a'] || keys['ArrowLeft']) {
-                        steerTarget = -0.5;
+                        steerTarget = -0.3;  // Reduced from -0.5
                     } 
                     else if (keys['d'] || keys['ArrowRight']) {
-                        steerTarget = 0.5;
+                        steerTarget = 0.3;   // Reduced from 0.5
                     } 
-                    // With hysteresis: locks at ±3.0 until released
                     else if (tiltValue <= -2.8) {
-                        steerTarget = -0.5;
+                        steerTarget = -0.3;  // Reduced from -0.5
                     } 
                     else if (tiltValue >= 2.8) {
-                        steerTarget = 0.5;
+                        steerTarget = 0.3;   // Reduced from 0.5
                     }
                     
-                    const STEER_SMOOTH = 0.20;
+                    const STEER_SMOOTH = 0.15;  // Reduced from 0.20 for smoother movement
                     steerCurrent += (steerTarget - steerCurrent) * STEER_SMOOTH;
                     if (Math.abs(steerCurrent) < 0.02) steerCurrent = 0;
 
@@ -566,40 +535,78 @@
 
                     const trafficSpeed = 0.6 + speed; spawnTimer += trafficSpeed;
                     if(spawnTimer > spawnRate) { 
-                        spawnTimer = 0; const r = Math.random(); let type = 'sedan'; let col = 0x555555;
-                        if(r<0.2) type='police'; else if(r<0.4) { type='ambulance'; col=0xFF0000; } else if(r<0.6) { type='sport'; col=0x00FF00; } 
-                        else col = [0xAA0000, 0x0000AA, 0x228B22, 0xFF8C00, 0x8A2BE2, 0x00FFFF, 0x32CD32, 0xFFFF00][Math.floor(Math.random()*8)];
-                        const c = createCar(type, col); c.position.set(LANES[Math.floor(Math.random()*3)], 0, -250); c.rotation.y = Math.PI;
-                        scene.add(c); gameStateRef.current.opponents.push({ mesh: c, laneIdx: Math.floor(Math.random()*3) });
+                        spawnTimer = 0; 
+                        const r = Math.random(); 
+                        let type = 'sedan'; 
+                        let col = 0x555555;
+                        
+                        if(r<0.15) type='police'; 
+                        else if(r<0.25) { type='ambulance'; }  // White ambulance
+                        else if(r<0.40) { type='van'; col=[0xAA0000, 0x0000AA, 0x228B22][Math.floor(Math.random()*3)]; }  // Colored van
+                        else if(r<0.55) { type='sport'; col=0x00FF00; } 
+                        else col = [0xAA0000, 0x0000AA, 0x228B22, 0xFF8C00, 0x8A2BE2, 0x00FFFF][Math.floor(Math.random()*6)];
+                        
+                        const c = createCar(type, col); 
+                        c.position.set(LANES[Math.floor(Math.random()*3)], 0, -250); 
+                        c.rotation.y = Math.PI;
+                        scene.add(c); 
+                        gameStateRef.current.opponents.push({ mesh: c, laneIdx: Math.floor(Math.random()*3) });
                     }
                     
                     const ops = gameStateRef.current.opponents;
                     for (let i = ops.length - 1; i >= 0; i--) {
-                        const opp = ops[i]; opp.mesh.position.z += trafficSpeed;
-                        if (laneSwitchProb > 0 && Math.random() < laneSwitchProb) {
-                             const next = opp.laneIdx + (Math.random()>0.5?1:-1); if(next>=0 && next<=2) opp.laneIdx = next;
+                        const opp = ops[i]; 
+                        opp.mesh.position.z += trafficSpeed;
+                        
+                        // Lane changing only when far away
+                        const distanceFromPlayer = opp.mesh.position.z - playerCar.position.z;
+                        if (laneSwitchProb > 0 && Math.random() < laneSwitchProb && distanceFromPlayer < -laneChangeDistance) {
+                             const next = opp.laneIdx + (Math.random()>0.5?1:-1); 
+                             if(next>=0 && next<=2) opp.laneIdx = next;
                         }
-                        const targetX = LANES[opp.laneIdx]; const dx = targetX - opp.mesh.position.x;
-                        if(Math.abs(dx) > 0.1) { opp.mesh.position.x += dx * 0.03; opp.mesh.rotation.y = Math.PI + (dx>0?-0.1:0.1); } else opp.mesh.rotation.y = Math.PI;
+                        
+                        const targetX = LANES[opp.laneIdx]; 
+                        const dx = targetX - opp.mesh.position.x;
+                        if(Math.abs(dx) > 0.1) { 
+                            opp.mesh.position.x += dx * 0.03; 
+                            opp.mesh.rotation.y = Math.PI + (dx>0?-0.1:0.1); 
+                        } else opp.mesh.rotation.y = Math.PI;
                         
                         const distanceZ = Math.abs(opp.mesh.position.z - playerCar.position.z);
                         const distanceX = Math.abs(opp.mesh.position.x - playerCar.position.x);
                         
                         if (distanceZ < 4.0 && distanceX < 3.0) {
-                            console.log("💥 COLLISION!");
-                            sendVibration(true); 
-                            setGameOver(true); 
-                            gameStateRef.current.isGameOver = true; 
+                            console.log("💥 HIT!");
                             
-                            const h = localStorage.getItem('blockyRacerHighScore') ? parseInt(localStorage.getItem('blockyRacerHighScore')) : 0;
-                            if (gameStateRef.current.score > h) { 
-                                localStorage.setItem('blockyRacerHighScore', gameStateRef.current.score); 
-                                setHighScore(gameStateRef.current.score); 
-                                setNewRecord(true); 
+                            // Reduce life
+                            gameStateRef.current.lives--;
+                            setLives(gameStateRef.current.lives);
+                            
+                            if (gameStateRef.current.lives <= 0) {
+                                // GAME OVER - longer vibration
+                                console.log("💀 GAME OVER!");
+                                sendVibration(true, 800);
+                                setGameOver(true); 
+                                gameStateRef.current.isGameOver = true; 
+                                
+                                const h = localStorage.getItem('blockyRacerHighScore') ? parseInt(localStorage.getItem('blockyRacerHighScore')) : 0;
+                                if (gameStateRef.current.score > h) { 
+                                    localStorage.setItem('blockyRacerHighScore', gameStateRef.current.score); 
+                                    setHighScore(gameStateRef.current.score); 
+                                    setNewRecord(true); 
+                                } else {
+                                    setNewRecord(false);
+                                }
                             } else {
-                                setNewRecord(false);
+                                // Still has lives - normal vibration
+                                sendVibration(true, 400);
                             }
+                            
+                            // Remove the car that was hit
+                            scene.remove(opp.mesh); 
+                            ops.splice(i, 1);
                         }
+                        
                         if(opp.mesh.position.z > 80) { scene.remove(opp.mesh); ops.splice(i, 1); }
                     }
                     renderer.render(scene, camera);
@@ -627,11 +634,18 @@
                     <div ref={mountRef} style={{width:'100%', height:'100%'}} />
                     
                     {gameStarted && !gameOver && (
-                    <div id="hud">
-                        <div style={{fontSize: 32, fontWeight: 'bold'}}>Score: {score}</div>
-                        <div style={{fontSize: 32, fontWeight: 'bold', color: '#FFFF00', marginTop: 5}}>High Score: {highScore}</div>
-                        <div style={{fontSize: 18, color: '#000000', marginTop: 10, fontWeight: 'bold', textShadow: '1px 1px 0 #fff'}}>Difficulty: {uiDifficulty}</div>
-                    </div>
+                    <>
+                        <div id="hud">
+                            <div style={{fontSize: 32, fontWeight: 'bold'}}>Score: {score}</div>
+                            <div style={{fontSize: 32, fontWeight: 'bold', color: '#FFFF00', marginTop: 5}}>High Score: {highScore}</div>
+                            <div style={{fontSize: 18, color: '#000000', marginTop: 10, fontWeight: 'bold', textShadow: '1px 1px 0 #fff'}}>Difficulty: {uiDifficulty}</div>
+                        </div>
+                        <div id="lives">
+                            <span style={{color: lives >= 1 ? '#ff0000' : '#666'}}>❤</span>
+                            <span style={{color: lives >= 2 ? '#ff0000' : '#666'}}>❤</span>
+                            <span style={{color: lives >= 3 ? '#ff0000' : '#666'}}>❤</span>
+                        </div>
+                    </>
                     )}
 
                     {gameStarted && !gameOver && <div id="menuBtn" onClick={toggleMenu}>MENU</div>}
@@ -651,8 +665,8 @@
                     {!gameStarted && (
                         <div id="overlayScreen">
                             <h1 style={{fontSize:'80px', margin:0, color:'#4CAF50', textShadow:'4px 4px 0 #000'}}>BLOCKY RACER</h1>
-                            <p style={{fontSize:'24px', opacity:0.8}}>Polling Mode v6.0</p>
                             <p style={{marginTop:'20px', fontSize:'18px'}}>High Score: {highScore}</p>
+                            <button className="reset-score-btn" onClick={resetHighScore}>Reset High Score</button>
                             <button 
                                 className={`bt-btn ${btConnected?'connected':btConnecting?'connecting':''}`} 
                                 onClick={!btConnected && !btConnecting ? connectBluetooth : null}
@@ -669,8 +683,9 @@
                             <h1 style={{color:'#ff4444', fontSize:'80px', margin:0}}>CRASHED!</h1>
                             <p style={{fontSize:'32px'}}>Score: {score}</p>
                             {newRecord && <div style={{background:'#FFD700', color:'black', padding:'10px 20px', borderRadius:'5px', fontWeight:'bold', fontSize:'20px', marginBottom:'20px'}}>🏆 NEW HIGH SCORE! 🏆</div>}
+                            <p style={{fontSize:'18px', color:'#aaa'}}>Press SPACE or button to restart</p>
                             <button className="big-btn" onClick={onPlayAgain}>PLAY AGAIN</button>
-                            <button className="restart-btn" onClick={()=>{setGameStarted(false); setGameOver(false); setScore(0);}}>MAIN MENU</button>
+                            <button className="restart-btn" onClick={()=>{setGameStarted(false); setGameOver(false); setScore(0); setLives(3);}}>MAIN MENU</button>
                         </div>
                     )}
                 </div>
