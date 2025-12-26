@@ -86,26 +86,21 @@
             }, []);
 
             useEffect(() => {
-                window.manualVibe = async () => {
-                    if (btRef.current.vibeChar) {
-                        console.log("═══════════════════════════════");
-                        console.log("   🧪 MANUAL TEST VIBRATION");
-                        console.log("═══════════════════════════════");
-                        try {
-                            const data = new Uint8Array([1]);
-                            await btRef.current.vibeChar.writeValue(data);
-                            new Uint8Array([1])
-                            console.log("✓ TEST VIBE SENT!");
-                            alert("Vibration command sent! Check ESP32 serial monitor.");
-                        } catch(e) { 
-                            console.error("✗ Manual Vibe Failed:", e);
-                            alert("Vibration failed: " + e.message);
-                        }
-                    } else {
-                        alert("Not connected to Controller!\n\nClick 'PAIR CONTROLLER' first.");
-                        console.error("No vibration characteristic - not connected");
-                    }
-                };
+              window.manualVibe = async () => {
+                if (!btRef.current.vibeChar) {
+                  alert("Not connected!");
+                  return;
+                }
+            
+                try {
+                  await btRef.current.vibeChar.writeValue(
+                    new Uint8Array([1])
+                  );
+                  console.log("✓ TEST VIBE SENT!");
+                } catch (e) {
+                  console.error("Vibration failed:", e);
+                }
+              };
             }, [btConnected]);
 
                const connectBluetooth = async () => {
@@ -135,22 +130,23 @@
               // Locate this inside your connectBluetooth function
                 await sensorChar.startNotifications();
                 console.log("✓ Notifications enabled!");
+                                
+             sensorChar.addEventListener('characteristicvaluechanged', (event) => {
+                  const dataView = event.target.value;
+                  let text = "";
                 
-                sensorChar.addEventListener('characteristicvaluechanged', (event) => {
-                    const value = event.target.value;
-                    const decoder = new TextDecoder('utf-8');
-                    const rawString = decoder.decode(value);
-                    const val = parseFloat(rawString);
-                    
-                    if (!isNaN(val)) {
-                        // Force the update to the ref
-                        btRef.current.tilt = val;
-                        
-                        // Update the visual debug panel immediately
-                        const tx = document.getElementById('tx');
-                        if(tx) tx.innerText = val.toFixed(2);
-                    }
+                  for (let i = 0; i < dataView.byteLength; i++) {
+                    text += String.fromCharCode(dataView.getUint8(i));
+                  }
+                
+                  const val = parseFloat(text);
+                
+                  if (!isNaN(val)) {
+                    btRef.current.tilt = val;
+                    window.updateDebug(null, val);
+                  }
                 });
+
 
                 console.log("🔍 Getting vibration characteristic...");
                 const vibeChar = await service.getCharacteristic(VIBE_CHAR_UUID);
@@ -473,6 +469,7 @@
     </script>
 </body>
 </html>
+
 
 
 
