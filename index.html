@@ -108,7 +108,7 @@
                 console.log("🔍 Starting Bluetooth scan...");
                 
                 const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ services: [SERVICE_UUID] }];
+                    filters: [{ name: 'BlockyRacer' }],
                     optionalServices: [SERVICE_UUID]
                 });
                 
