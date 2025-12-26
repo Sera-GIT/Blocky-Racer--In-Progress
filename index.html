@@ -232,15 +232,19 @@
                     await buttonChar.startNotifications();
                     
                     buttonChar.addEventListener('characteristicvaluechanged', (event) => {
-                        const val = event.target.value.getUint8(0);
-                        if (val === 1) {
-                            console.log("🔘 Button pressed - SPACE!");
-                            // Trigger restart if game over
-                            if (gameStateRef.current.isGameOver) {
-                                triggerRestart();
-                            }
-                        }
-                    });
+                    const val = event.target.value.getUint8(0);
+                    if (val === 1) {
+                        console.log("🔘 Button pressed - simulating SPACE!");
+                        // Simulate space key press
+                        const spaceEvent = new KeyboardEvent('keydown', {
+                            code: 'Space',
+                            key: ' ',
+                            keyCode: 32,
+                            bubbles: true
+                        });
+                        window.dispatchEvent(spaceEvent);
+                    }
+                });
                     
                     btRef.current = { 
                         device, 
@@ -696,3 +700,4 @@
     </script>
 </body>
 </html>
+
