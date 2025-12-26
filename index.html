@@ -3,21 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blocky Racer: DEBUG MODE</title>
+    <title>Blocky Racer: ULTIMATE DEBUG</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: Arial, sans-serif; }
         
+        /* --- THE NUCLEAR DEBUG BOX --- */
+        /* This is standard HTML, sitting above the game with maximum Z-Index */
+        #force-debug {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 350px;
+            background-color: #ff0000; /* Bright Red */
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 15px;
+            border: 4px solid white;
+            z-index: 2147483647; /* Maximum possible Z-Index */
+            pointer-events: none; /* Let you click through it */
+        }
+
         #loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: white; display: flex; justify-content: center; align-items: center; z-index: 999; transition: opacity 0.5s; }
-        
-        /* HUD and MENU Styles */
         #hud { position: absolute; top: 20px; right: 20px; color: white; text-shadow: 2px 2px 4px #000; z-index: 10; pointer-events: none; text-align: right; }
         #menuBtn { position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.6); color: white; border: 2px solid white; padding: 10px 20px; font-size: 18px; font-weight: bold; cursor: pointer; z-index: 20; border-radius: 5px; pointer-events: auto; }
         #sideMenu { position: absolute; top: 0; right: -350px; width: 300px; height: 100%; background: rgba(0,0,0,0.95); color: white; z-index: 100; padding: 30px; box-sizing: border-box; transition: right 0.3s ease-out; display: flex; flex-direction: column; border-left: 2px solid #444; }
         #sideMenu.open { right: 0; }
         .menu-opt { margin: 10px 0; padding: 15px; background: #333; cursor: pointer; border: 1px solid #555; text-align: center; border-radius: 5px; transition: all 0.2s; }
         .menu-opt.active { background: #4CAF50; border-color: #81C784; font-weight: bold; }
-        
-        /* Overlay */
         #overlayScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 50; color: white; }
         .big-btn { padding: 20px 60px; font-size: 32px; background: #4CAF50; color: white; border: none; border-radius: 10px; cursor: pointer; margin-top: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
         .bt-btn { padding: 15px 40px; font-size: 20px; background: #2196F3; color: white; border: none; border-radius: 30px; cursor: pointer; margin-top: 20px; display: flex; align-items: center; gap: 10px; }
@@ -29,16 +43,32 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
+    <div id="force-debug">
+        SYSTEM READY<br>
+        ----------------<br>
+        BT Status: <span id="db-status">WAITING</span><br>
+        Raw Tilt : <span id="db-raw">0.00</span><br>
+        Game Tilt: <span id="db-game">0.00</span><br>
+        ----------------<br>
+        STEERING: <span id="db-steer">CENTER</span>
+    </div>
+
     <div id="loader">Loading Assets...</div>
     <div id="root"></div>
 
     <script type="text/babel">
         const { useEffect, useRef, useState } = React;
 
+        // --- HELPER TO UPDATE THE RAW HTML BOX ---
+        window.updateDebug = (status, raw, game, steer) => {
+            if (status) document.getElementById('db-status').innerText = status;
+            if (raw !== null) document.getElementById('db-raw').innerText = raw.toFixed(2);
+            if (game !== null) document.getElementById('db-game').innerText = game.toFixed(2);
+            if (steer) document.getElementById('db-steer').innerText = steer;
+        };
+
         const BlockyCarGame = () => {
             const mountRef = useRef(null);
-            
-            // --- STATE ---
             const [gameStarted, setGameStarted] = useState(false);
             const [gameOver, setGameOver] = useState(false);
             const [score, setScore] = useState(0);
@@ -47,9 +77,6 @@
             const [menuOpen, setMenuOpen] = useState(false);
             const [uiDifficulty, setUiDifficulty] = useState('Progressive');
             const [btConnected, setBtConnected] = useState(false);
-            
-            // --- DEBUG STATE (Forces the box to update) ---
-            const [debugData, setDebugData] = useState({ status: "Waiting...", raw: 0, tilt: 0 });
 
             const btRef = useRef({ device: null, server: null, sensorChar: null, vibeChar: null, tilt: 0 });
             const gameStateRef = useRef({
@@ -68,8 +95,7 @@
 
            const connectBluetooth = async () => {
             try {
-                setDebugData(prev => ({ ...prev, status: "Searching..." }));
-                
+                window.updateDebug("SEARCHING...", null, null, null);
                 const device = await navigator.bluetooth.requestDevice({
                     filters: [{ services: [SERVICE_UUID] }]
                 });
@@ -78,7 +104,6 @@
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 
-                // Sensor
                 const sensorChar = await service.getCharacteristic(SENSOR_CHAR_UUID);
                 await sensorChar.startNotifications();
                 
@@ -88,37 +113,36 @@
                     let val = parseFloat(rawString);
 
                     if (!isNaN(val)) {
-                        // SENSITIVITY FIX: Divide Raw by 3.0
+                        // --- SENSITIVITY FIX ---
+                        // Divide by 3.0 to lower sensitivity
                         let gameTilt = val / 3.0; 
                         btRef.current.tilt = gameTilt;
+
+                        // UPDATE THE RED BOX DIRECTLY
+                        let steerText = "CENTER";
+                        if (gameTilt > 4) steerText = ">>> RIGHT >>>";
+                        if (gameTilt < -4) steerText = "<<< LEFT <<<";
                         
-                        // Update the Blue Box
-                        setDebugData({ 
-                            status: "Connected", 
-                            raw: val, 
-                            tilt: gameTilt 
-                        });
+                        window.updateDebug("CONNECTED", val, gameTilt, steerText);
                     }
                 });
 
-                // Vibe
                 const vibeChar = await service.getCharacteristic(VIBE_CHAR_UUID);
-                
                 btRef.current = { device, server, sensorChar, vibeChar, tilt: 0 };
                 setBtConnected(true);
-                setDebugData(prev => ({ ...prev, status: "Connected!" }));
+                window.updateDebug("CONNECTED!", 0, 0, "CENTER");
                 
                 } catch (error) {
                     console.error("Bluetooth Error:", error);
-                    setDebugData(prev => ({ ...prev, status: "Error: " + error }));
-                    alert("Connection Failed. Did you reset the ESP32?");
+                    window.updateDebug("ERROR: " + error, null, null, null);
+                    alert("Connection Failed. 1. Reset ESP32. 2. Close other tabs.");
                 }
             };
 
             const onDisconnected = () => {
                 setBtConnected(false);
                 btRef.current.vibeChar = null;
-                setDebugData(prev => ({ ...prev, status: "Disconnected" }));
+                window.updateDebug("DISCONNECTED", 0, 0, "---");
             };
 
             const sendVibration = async () => {
@@ -296,21 +320,6 @@
             return (
                 <div style={{width:'100vw', height:'100vh', position:'relative', overflow:'hidden'}}>
                     
-                    {/* --- UNMISSABLE DEBUG BOX --- */}
-                    <div style={{
-                        position: 'absolute', top: 10, left: 10, width: 300,
-                        backgroundColor: 'rgba(0, 0, 200, 0.9)', 
-                        border: '4px solid yellow', 
-                        color: 'white', padding: 20, 
-                        fontFamily: 'monospace', fontSize: 20, zIndex: 99999
-                    }}>
-                        <b>DEBUG MODE</b><br/>
-                        Status: {debugData.status}<br/>
-                        Raw In: {debugData.raw.toFixed(2)}<br/>
-                        Game Tilt: {debugData.tilt.toFixed(2)}<br/>
-                        <small style={{color:'yellow'}}>Need > 4.0 to turn</small>
-                    </div>
-
                     <div ref={mountRef} style={{width:'100%', height:'100%'}} />
                     
                     {/* HUD */}
