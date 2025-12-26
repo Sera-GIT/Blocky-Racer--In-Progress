@@ -336,15 +336,15 @@
 
                     // Roll-based steering with hysteresis zones
                     // ESP32 sends: -5 (Left), 0 (Center), 5 (Right)
-                    const SENSITIVITY = 0.1;
                     let steer = 0;
+
+                    // Keyboard fallback
+                    if (keys['a'] || keys['ArrowLeft']) steer = -0.6;
+                    else if (keys['d'] || keys['ArrowRight']) steer = 0.6;
                     
-                    if (keys['a'] || keys['ArrowLeft']) steer = -0.5;
-                    else if (keys['d'] || keys['ArrowRight']) steer = 0.5;
-                    else if (Math.abs(tilt) > 0.1) {
-                         steer = tilt * SENSITIVITY;
-                         steer = Math.max(-0.5, Math.min(0.5, steer));
-                    }
+                    // ESP32 steering (DISCRETE)
+                    else if (tilt === -5) steer = -0.6;
+                    else if (tilt === 5)  steer = 0.6;
 
                     if (playerCar.position.x > -13 && steer < 0) {
                          playerCar.position.x += steer;
@@ -457,3 +457,4 @@
     </script>
 </body>
 </html>
+
