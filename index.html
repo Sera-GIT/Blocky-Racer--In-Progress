@@ -132,16 +132,23 @@
                 const sensorChar = await service.getCharacteristic(SENSOR_CHAR_UUID);
                 console.log("✓ Sensor characteristic ready!");
                 
+              // Locate this inside your connectBluetooth function
                 await sensorChar.startNotifications();
                 console.log("✓ Notifications enabled!");
                 
                 sensorChar.addEventListener('characteristicvaluechanged', (event) => {
+                    const value = event.target.value;
                     const decoder = new TextDecoder('utf-8');
-                    const rawString = decoder.decode(event.target.value);
-                    let val = parseFloat(rawString);
+                    const rawString = decoder.decode(value);
+                    const val = parseFloat(rawString);
+                    
                     if (!isNaN(val)) {
+                        // Force the update to the ref
                         btRef.current.tilt = val;
-                        window.updateDebug(null, val);
+                        
+                        // Update the visual debug panel immediately
+                        const tx = document.getElementById('tx');
+                        if(tx) tx.innerText = val.toFixed(2);
                     }
                 });
 
@@ -466,6 +473,7 @@
     </script>
 </body>
 </html>
+
 
 
 
