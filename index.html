@@ -3,28 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blocky Racer: ULTIMATE DEBUG</title>
+    <title>Blocky Racer: Smooth Edition</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: Arial, sans-serif; }
         
-        /* --- THE NUCLEAR DEBUG BOX --- */
-        /* This is standard HTML, sitting above the game with maximum Z-Index */
-        #force-debug {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 350px;
-            background-color: #ff0000; /* Bright Red */
-            color: white;
-            font-family: 'Courier New', monospace;
-            font-size: 18px;
-            font-weight: bold;
-            padding: 15px;
-            border: 4px solid white;
-            z-index: 2147483647; /* Maximum possible Z-Index */
-            pointer-events: none; /* Let you click through it */
-        }
-
         #loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: white; display: flex; justify-content: center; align-items: center; z-index: 999; transition: opacity 0.5s; }
         #hud { position: absolute; top: 20px; right: 20px; color: white; text-shadow: 2px 2px 4px #000; z-index: 10; pointer-events: none; text-align: right; }
         #menuBtn { position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.6); color: white; border: 2px solid white; padding: 10px 20px; font-size: 18px; font-weight: bold; cursor: pointer; z-index: 20; border-radius: 5px; pointer-events: auto; }
@@ -43,29 +25,11 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
 <body>
-    <div id="force-debug">
-        SYSTEM READY<br>
-        ----------------<br>
-        BT Status: <span id="db-status">WAITING</span><br>
-        Raw Tilt : <span id="db-raw">0.00</span><br>
-        Game Tilt: <span id="db-game">0.00</span><br>
-        ----------------<br>
-        STEERING: <span id="db-steer">CENTER</span>
-    </div>
-
     <div id="loader">Loading Assets...</div>
     <div id="root"></div>
 
     <script type="text/babel">
         const { useEffect, useRef, useState } = React;
-
-        // --- HELPER TO UPDATE THE RAW HTML BOX ---
-        window.updateDebug = (status, raw, game, steer) => {
-            if (status) document.getElementById('db-status').innerText = status;
-            if (raw !== null) document.getElementById('db-raw').innerText = raw.toFixed(2);
-            if (game !== null) document.getElementById('db-game').innerText = game.toFixed(2);
-            if (steer) document.getElementById('db-steer').innerText = steer;
-        };
 
         const BlockyCarGame = () => {
             const mountRef = useRef(null);
@@ -77,6 +41,9 @@
             const [menuOpen, setMenuOpen] = useState(false);
             const [uiDifficulty, setUiDifficulty] = useState('Progressive');
             const [btConnected, setBtConnected] = useState(false);
+
+            // This flag prevents flooding the bluetooth with crash commands
+            const isVibratingRef = useRef(false);
 
             const btRef = useRef({ device: null, server: null, sensorChar: null, vibeChar: null, tilt: 0 });
             const gameStateRef = useRef({
@@ -95,7 +62,6 @@
 
            const connectBluetooth = async () => {
             try {
-                window.updateDebug("SEARCHING...", null, null, null);
                 const device = await navigator.bluetooth.requestDevice({
                     filters: [{ services: [SERVICE_UUID] }]
                 });
@@ -113,44 +79,43 @@
                     let val = parseFloat(rawString);
 
                     if (!isNaN(val)) {
-                        // --- SENSITIVITY FIX ---
-                        // Divide by 3.0 to lower sensitivity
-                        let gameTilt = val / 3.0; 
-                        btRef.current.tilt = gameTilt;
-
-                        // UPDATE THE RED BOX DIRECTLY
-                        let steerText = "CENTER";
-                        if (gameTilt > 4) steerText = ">>> RIGHT >>>";
-                        if (gameTilt < -4) steerText = "<<< LEFT <<<";
-                        
-                        window.updateDebug("CONNECTED", val, gameTilt, steerText);
+                        // We store the RAW tilt here. We will do the smoothing math in the game loop.
+                        btRef.current.tilt = val;
                     }
                 });
 
                 const vibeChar = await service.getCharacteristic(VIBE_CHAR_UUID);
                 btRef.current = { device, server, sensorChar, vibeChar, tilt: 0 };
                 setBtConnected(true);
-                window.updateDebug("CONNECTED!", 0, 0, "CENTER");
                 
                 } catch (error) {
                     console.error("Bluetooth Error:", error);
-                    window.updateDebug("ERROR: " + error, null, null, null);
-                    alert("Connection Failed. 1. Reset ESP32. 2. Close other tabs.");
+                    alert("Connection Failed. Did you reset the ESP32?");
                 }
             };
 
             const onDisconnected = () => {
                 setBtConnected(false);
                 btRef.current.vibeChar = null;
-                window.updateDebug("DISCONNECTED", 0, 0, "---");
             };
 
             const sendVibration = async () => {
-                if (btRef.current.vibeChar) {
+                // --- CRITICAL FIX: DEBOUNCE VIBRATION ---
+                // If we are already vibrating, DO NOT send another command.
+                // This prevents the game from sending 60 commands per second and crashing the bluetooth.
+                if (btRef.current.vibeChar && !isVibratingRef.current) {
                     try {
+                        isVibratingRef.current = true; // Lock
                         const encoder = new TextEncoder('utf-8');
                         await btRef.current.vibeChar.writeValue(encoder.encode('1'));
-                    } catch(e) { console.error("Vibe Error", e); }
+                        
+                        // Unlock after 1 second so we can crash again later
+                        setTimeout(() => { isVibratingRef.current = false; }, 1000);
+                        
+                    } catch(e) { 
+                        console.error("Vibe Error", e); 
+                        isVibratingRef.current = false; // Unlock if error
+                    }
                 }
             };
 
@@ -169,7 +134,6 @@
                 }
             };
 
-            // ... (Visual helpers unchanged) ...
             const updateRowVisuals = (rowObj, isRural) => {
                 rowObj.treeOuterL.visible = isRural; rowObj.treeOuterR.visible = isRural;
                 rowObj.treeInnerL.visible = false; rowObj.treeInnerR.visible = false;
@@ -262,10 +226,40 @@
 
                     let tr = 0, tt = 0;
                     const tilt = btRef.current.tilt;
+
+                    // --- SMOOTH STEERING LOGIC ---
+                    // 1. Deadzone: If tilt is between -5 and 5, do nothing (prevents jitter).
+                    // 2. Analog Turn: If tilt is > 5, turn right proportionally.
+                    // 3. Sensitivity: Multiplied by 0.015 for "Gradual" control.
                     
-                    // --- CONTROL FIX: LOWERED THRESHOLD TO 4 ---
-                    if((keys['a']||keys['ArrowLeft']||tilt>4) && playerCar.position.x > -13) { playerCar.position.x-=0.4; tr=0.3; tt=-0.15; }
-                    if((keys['d']||keys['ArrowRight']||tilt<-4) && playerCar.position.x < 13) { playerCar.position.x+=0.4; tr=-0.3; tt=0.15; }
+                    const DEADZONE = 5.0;
+                    const SENSITIVITY = 0.015; 
+
+                    let steeringInput = 0;
+
+                    // KEYBOARD OVERRIDE
+                    if(keys['a']||keys['ArrowLeft']) steeringInput = -0.5;
+                    else if(keys['d']||keys['ArrowRight']) steeringInput = 0.5;
+                    else {
+                        // TILT CONTROL
+                        if (Math.abs(tilt) > DEADZONE) {
+                            // Subtract deadzone so it starts turning smoothly from 0 speed
+                            let activeTilt = (Math.abs(tilt) - DEADZONE) * (tilt > 0 ? 1 : -1);
+                            steeringInput = activeTilt * SENSITIVITY; 
+                        }
+                    }
+
+                    // Apply steering to car position
+                    if (playerCar.position.x > -13 && steeringInput < 0) {
+                         playerCar.position.x += steeringInput;
+                         tr = 0.3 * (Math.abs(steeringInput) * 3); // Bank car based on turn speed
+                         tt = -0.15;
+                    } 
+                    else if (playerCar.position.x < 13 && steeringInput > 0) {
+                         playerCar.position.x += steeringInput;
+                         tr = -0.3 * (Math.abs(steeringInput) * 3);
+                         tt = 0.15;
+                    }
 
                     currentRot += (tr-currentRot)*0.1; currentTilt += (tt-currentTilt)*0.1;
                     playerCar.rotation.y = currentRot; playerCar.rotation.z = currentTilt;
