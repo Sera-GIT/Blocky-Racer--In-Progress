@@ -57,6 +57,13 @@
         <div><b>TILT VALUE:</b> <span id="tx">0.00</span></div>
         <div><b>STEERING:</b> <span id="act">CENTER</span></div>
         <div><b>PACKETS:</b> <span id="rcv">0</span></div>
+
+        <hr style="border-color:#0f0;">
+        <div><b>THROTTLE BLE:</b> <span id="thst" class="status-disconnected">DISCONNECTED</span></div>
+        <div><b>THROTTLE:</b> <span id="thv">0.00</span></div>
+        <div><b>THROTTLE PKTS:</b> <span id="thrcv">0</span></div>
+        <button id="reconnectThrottleBtn" class="test-btn tertiary" style="margin-top:8px;">🔄 RECONNECT THROTTLE</button>
+
         <hr style="border-color:#0f0;">
         <div style="font-size:11px;"><b>VIBRATION:</b></div>
         <div><b>Status:</b> <span id="vibeStatus">Ready</span></div>
@@ -91,6 +98,21 @@
             }
         };
 
+        // NEW: throttle debug updater
+        window.updateThrottleDebug = (status, throttleVal) => {
+            const stEl = document.getElementById('thst');
+            if (status && stEl) {
+                stEl.innerText = status;
+                stEl.className = status === 'CONNECTED' ? 'status-connected' :
+                                 status === 'CONNECTING...' ? 'status-connecting' :
+                                 'status-disconnected';
+            }
+            if (throttleVal !== null && throttleVal !== undefined) {
+                const thEl = document.getElementById('thv');
+                if (thEl) thEl.innerText = throttleVal.toFixed(2);
+            }
+        };
+
         const BlockyCarGame = () => {
             const mountRef = useRef(null);
             const [gameStarted, setGameStarted] = useState(false);
@@ -104,10 +126,16 @@
             const [btConnected, setBtConnected] = useState(false);
             const [btConnecting, setBtConnecting] = useState(false);
 
+            // NEW: throttle BT UI states
+            const [thBtConnected, setThBtConnected] = useState(false);
+            const [thBtConnecting, setThBtConnecting] = useState(false);
+
             const vibeTimeoutRef = useRef(null);
             const packetCountRef = useRef(0);
             const vibeCountRef = useRef(0);
-            const reconnectAttempts = useRef(0);
+
+            // NEW: throttle packet count
+            const throttlePacketCountRef = useRef(0);
             
             const btRef = useRef({ 
                 device: null, 
@@ -118,6 +146,15 @@
                 tilt: 0,
                 isConnecting: false 
             });
+
+            // NEW: throttle device ref
+            const throttleBtRef = useRef({
+                device: null,
+                server: null,
+                throttleChar: null,
+                throttle: 0.0,
+                isConnecting: false
+            });
             
             const gameStateRef = useRef({
                 isGameOver: false, isPaused: false, score: 0, lives: 3,
@@ -125,10 +162,15 @@
                 gameStarted: false
             });
 
+            // Existing controller (tilt/vibe/button)
             const SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
             const SENSOR_CHAR_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
             const VIBE_CHAR_UUID = "19b10002-e8f2-537e-4f6c-d104768a1214";
             const BUTTON_CHAR_UUID = "19b10003-e8f2-537e-4f6c-d104768a1214";
+
+            // NEW throttle service (separate ESP32-C3)
+            const THROTTLE_SERVICE_UUID = "19b20000-e8f2-537e-4f6c-d104768a1214";
+            const THROTTLE_CHAR_UUID    = "19b20001-e8f2-537e-4f6c-d104768a1214";
 
             useEffect(() => {
                 const saved = localStorage.getItem('blockyRacerHighScore');
@@ -159,7 +201,6 @@
                 setBtConnected(false);
                 setBtConnecting(false);
                 
-                // SAFE: Don't crash, just reset
                 if (btRef.current) {
                     btRef.current.tilt = 0;
                     btRef.current.device = null;
@@ -172,6 +213,23 @@
                 
                 window.updateDebug("DISCONNECTED", 0, "---");
                 updateVibeStatus("Disconnected", false);
+            };
+
+            // NEW: throttle disconnect handler
+            const onThrottleDisconnected = () => {
+                console.log("⚠️ THROTTLE DEVICE DISCONNECTED");
+                setThBtConnected(false);
+                setThBtConnecting(false);
+
+                if (throttleBtRef.current) {
+                    throttleBtRef.current.throttle = 0.0;
+                    throttleBtRef.current.device = null;
+                    throttleBtRef.current.server = null;
+                    throttleBtRef.current.throttleChar = null;
+                    throttleBtRef.current.isConnecting = false;
+                }
+
+                window.updateThrottleDebug("DISCONNECTED", 0.0);
             };
 
             const connectBluetooth = async (isReconnect = false) => {
@@ -227,24 +285,22 @@
                     
                     const vibeChar = await service.getCharacteristic(VIBE_CHAR_UUID);
                     
-                    // NEW: Get button characteristic
                     const buttonChar = await service.getCharacteristic(BUTTON_CHAR_UUID);
                     await buttonChar.startNotifications();
                     
                     buttonChar.addEventListener('characteristicvaluechanged', (event) => {
-                    const val = event.target.value.getUint8(0);
-                    if (val === 1) {
-                        console.log("🔘 Button pressed - simulating SPACE!");
-                        // Simulate space key press
-                        const spaceEvent = new KeyboardEvent('keydown', {
-                            code: 'Space',
-                            key: ' ',
-                            keyCode: 32,
-                            bubbles: true
-                        });
-                        window.dispatchEvent(spaceEvent);
-                    }
-                });
+                        const val = event.target.value.getUint8(0);
+                        if (val === 1) {
+                            console.log("🔘 Button pressed - simulating SPACE!");
+                            const spaceEvent = new KeyboardEvent('keydown', {
+                                code: 'Space',
+                                key: ' ',
+                                keyCode: 32,
+                                bubbles: true
+                            });
+                            window.dispatchEvent(spaceEvent);
+                        }
+                    });
                     
                     btRef.current = { 
                         device, 
@@ -258,7 +314,6 @@
                     
                     setBtConnected(true);
                     setBtConnecting(false);
-                    reconnectAttempts.current = 0;
                     window.updateDebug("CONNECTED", 0, "CENTER");
                     updateVibeStatus("Ready", true);
                     
@@ -272,6 +327,78 @@
                     window.updateDebug("ERROR", null, null);
                     updateLastError(error.message);
                     alert(`Connection Failed: ${error.message}`);
+                }
+            };
+
+            // NEW: connect throttle BLE device (separate ESP32-C3)
+            const connectThrottleBluetooth = async (isReconnect = false) => {
+                if (throttleBtRef.current.isConnecting) {
+                    console.log("⏸️ Throttle connection in progress");
+                    return;
+                }
+
+                try {
+                    throttleBtRef.current.isConnecting = true;
+                    setThBtConnecting(true);
+                    window.updateThrottleDebug("CONNECTING...", null);
+
+                    const device = isReconnect && throttleBtRef.current.device ?
+                        throttleBtRef.current.device :
+                        await navigator.bluetooth.requestDevice({
+                            filters: [{ services: [THROTTLE_SERVICE_UUID] }],
+                            optionalServices: [THROTTLE_SERVICE_UUID]
+                        });
+
+                    console.log("✓ Throttle Device:", device.name);
+                    device.addEventListener('gattserverdisconnected', onThrottleDisconnected);
+
+                    const server = await device.gatt.connect();
+                    await new Promise(resolve => setTimeout(resolve, 200));
+
+                    const service = await server.getPrimaryService(THROTTLE_SERVICE_UUID);
+                    const throttleChar = await service.getCharacteristic(THROTTLE_CHAR_UUID);
+
+                    await throttleChar.startNotifications();
+
+                    throttleChar.addEventListener('characteristicvaluechanged', (event) => {
+                        try {
+                            const val = event.target.value.getFloat32(0, true); // 0.0 .. 1.0
+                            if (!isNaN(val) && isFinite(val)) {
+                                const clamped = Math.max(0, Math.min(1, val));
+                                throttleBtRef.current.throttle = clamped;
+
+                                throttlePacketCountRef.current++;
+                                const thrcvEl = document.getElementById('thrcv');
+                                if (thrcvEl) thrcvEl.innerText = throttlePacketCountRef.current;
+
+                                window.updateThrottleDebug(null, clamped);
+                            }
+                        } catch (err) {
+                            console.error("Throttle data error:", err);
+                        }
+                    });
+
+                    throttleBtRef.current = {
+                        device,
+                        server,
+                        throttleChar,
+                        throttle: 0.0,
+                        isConnecting: false
+                    };
+
+                    setThBtConnected(true);
+                    setThBtConnecting(false);
+                    window.updateThrottleDebug("CONNECTED", 0.0);
+
+                    console.log("✅ Throttle connected!");
+
+                } catch (error) {
+                    console.error("❌ Throttle connection error:", error);
+                    throttleBtRef.current.isConnecting = false;
+                    setThBtConnecting(false);
+                    setThBtConnected(false);
+                    window.updateThrottleDebug("ERROR", null);
+                    alert(`Throttle Connection Failed: ${error.message}`);
                 }
             };
 
@@ -336,12 +463,13 @@
                 const calibBtn = document.getElementById('calibBtn');
                 const testBtn = document.getElementById('testVibeBtn');
                 const reconnectBtn = document.getElementById('reconnectBtn');
+                const reconnectThrottleBtn = document.getElementById('reconnectThrottleBtn');
                 
                 if (calibBtn) calibBtn.onclick = sendCalibration;
                 if (testBtn) testBtn.onclick = () => sendVibration(false);
                 if (reconnectBtn) reconnectBtn.onclick = () => connectBluetooth(false);
+                if (reconnectThrottleBtn) reconnectThrottleBtn.onclick = () => connectThrottleBluetooth(false);
                 
-                // SPACE BAR handler
                 const handleKeyPress = (e) => {
                     if (e.code === 'Space' && gameStateRef.current.isGameOver) {
                         e.preventDefault();
@@ -476,7 +604,6 @@
                     if (speed > 0) { gameStateRef.current.movingTime += 0.016; gameStateRef.current.totalDistance += speed; }
                     const t = gameStateRef.current.movingTime; const diffMode = gameStateRef.current.difficulty;
 
-                    // LANE CHANGING: adjusted for difficulty
                     let laneSwitchProb = 0, spawnRate = 80, laneChangeDistance = 80;
                     if (diffMode === 'Progressive') {
                         if (t > 30 && t <= 60) { laneSwitchProb=0.002; spawnRate=60; laneChangeDistance=100; }
@@ -485,27 +612,42 @@
                         if (diffMode === 'Medium') { laneSwitchProb=0.002; spawnRate=60; laneChangeDistance=100; }
                         else if (diffMode === 'Hard') { laneSwitchProb=0.008; spawnRate=55; laneChangeDistance=120; }
                     }
-                    
-                    if(keys['w']||keys['ArrowUp']) speed = Math.min(speed+0.025, 0.9); else speed = Math.max(speed-0.01, 0);
 
-                    // REDUCED STEERING SENSITIVITY - car moves less
+                    // =========================
+                    // FORWARD MOVEMENT (UPDATED)
+                    // =========================
+                    // Keyboard W/ArrowUp still works the same.
+                    // New throttle device provides throttle 0.0..1.0:
+                    const throttle = throttleBtRef.current.throttle || 0.0;
+                    const hasKeyboardForward = (keys['w'] || keys['ArrowUp']);
+                    const hasThrottleForward = (throttle > 0.02);
+
+                    if (hasKeyboardForward || hasThrottleForward) {
+                        // Keep your original "feel" but scale acceleration by throttle when using it
+                        const accel = hasKeyboardForward ? 0.025 : (0.030 * throttle);
+                        speed = Math.min(speed + accel, 0.9);
+                    } else {
+                        speed = Math.max(speed - 0.01, 0);
+                    }
+
+                    // STEERING (unchanged)
                     steerTarget = 0;
                     const tiltValue = btRef.current.tilt;
 
                     if (keys['a'] || keys['ArrowLeft']) {
-                        steerTarget = -0.3;  // Reduced from -0.5
+                        steerTarget = -0.3;
                     } 
                     else if (keys['d'] || keys['ArrowRight']) {
-                        steerTarget = 0.3;   // Reduced from 0.5
+                        steerTarget = 0.3;
                     } 
                     else if (tiltValue <= -2.8) {
-                        steerTarget = -0.3;  // Reduced from -0.5
+                        steerTarget = -0.3;
                     } 
                     else if (tiltValue >= 2.8) {
-                        steerTarget = 0.3;   // Reduced from 0.5
+                        steerTarget = 0.3;
                     }
                     
-                    const STEER_SMOOTH = 0.15;  // Reduced from 0.20 for smoother movement
+                    const STEER_SMOOTH = 0.15;
                     steerCurrent += (steerTarget - steerCurrent) * STEER_SMOOTH;
                     if (Math.abs(steerCurrent) < 0.02) steerCurrent = 0;
 
@@ -545,8 +687,8 @@
                         let col = 0x555555;
                         
                         if(r<0.15) type='police'; 
-                        else if(r<0.25) { type='ambulance'; }  // White ambulance
-                        else if(r<0.40) { type='van'; col=[0xAA0000, 0x0000AA, 0x228B22][Math.floor(Math.random()*3)]; }  // Colored van
+                        else if(r<0.25) { type='ambulance'; }
+                        else if(r<0.40) { type='van'; col=[0xAA0000, 0x0000AA, 0x228B22][Math.floor(Math.random()*3)]; }
                         else if(r<0.55) { type='sport'; col=0x00FF00; } 
                         else col = [0xAA0000, 0x0000AA, 0x228B22, 0xFF8C00, 0x8A2BE2, 0x00FFFF][Math.floor(Math.random()*6)];
                         
@@ -562,7 +704,6 @@
                         const opp = ops[i]; 
                         opp.mesh.position.z += trafficSpeed;
                         
-                        // Lane changing only when far away
                         const distanceFromPlayer = opp.mesh.position.z - playerCar.position.z;
                         if (laneSwitchProb > 0 && Math.random() < laneSwitchProb && distanceFromPlayer < -laneChangeDistance) {
                              const next = opp.laneIdx + (Math.random()>0.5?1:-1); 
@@ -582,12 +723,10 @@
                         if (distanceZ < 4.0 && distanceX < 3.0) {
                             console.log("💥 HIT!");
                             
-                            // Reduce life
                             gameStateRef.current.lives--;
                             setLives(gameStateRef.current.lives);
                             
                             if (gameStateRef.current.lives <= 0) {
-                                // GAME OVER - longer vibration
                                 console.log("💀 GAME OVER!");
                                 sendVibration(true, 800);
                                 setGameOver(true); 
@@ -602,11 +741,9 @@
                                     setNewRecord(false);
                                 }
                             } else {
-                                // Still has lives - normal vibration
                                 sendVibration(true, 400);
                             }
                             
-                            // Remove the car that was hit
                             scene.remove(opp.mesh); 
                             ops.splice(i, 1);
                         }
@@ -671,13 +808,24 @@
                             <h1 style={{fontSize:'80px', margin:0, color:'#4CAF50', textShadow:'4px 4px 0 #000'}}>BLOCKY RACER</h1>
                             <p style={{marginTop:'20px', fontSize:'18px'}}>High Score: {highScore}</p>
                             <button className="reset-score-btn" onClick={resetHighScore}>Reset High Score</button>
+
                             <button 
                                 className={`bt-btn ${btConnected?'connected':btConnecting?'connecting':''}`} 
                                 onClick={!btConnected && !btConnecting ? connectBluetooth : null}
                                 disabled={btConnecting}
                             >
-                                {btConnected ? '✅ CONTROLLER PAIRED' : btConnecting ? '🔄 CONNECTING...' : '📡 PAIR CONTROLLER'}
+                                {btConnected ? '✅ STEERING CONTROLLER PAIRED' : btConnecting ? '🔄 CONNECTING...' : '📡 PAIR STEERING CONTROLLER'}
                             </button>
+
+                            {/* NEW: throttle pair button */}
+                            <button 
+                                className={`bt-btn ${thBtConnected?'connected':thBtConnecting?'connecting':''}`} 
+                                onClick={!thBtConnected && !thBtConnecting ? connectThrottleBluetooth : null}
+                                disabled={thBtConnecting}
+                            >
+                                {thBtConnected ? '✅ THROTTLE PAIRED' : thBtConnecting ? '🔄 CONNECTING...' : '🌀 PAIR THROTTLE (ENCODER)'}
+                            </button>
+
                             <button className="big-btn" onClick={onStartGame}>START ENGINE</button>
                         </div>
                     )}
@@ -700,4 +848,5 @@
     </script>
 </body>
 </html>
+
 
