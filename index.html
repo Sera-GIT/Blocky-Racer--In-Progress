@@ -618,28 +618,27 @@
                     // =========================
                     // Keyboard W/ArrowUp still works the same.
                     // New throttle device provides throttle 0.0..1.0:
-               const encoderDelta = throttleBtRef.current.throttle || 0.0;
-                const hasKeyboardForward = (keys['w'] || keys['ArrowUp']);
-                
-                if (hasKeyboardForward) {
-                    // Standard keyboard behavior
-                    speed = Math.min(speed + 0.025, 0.9);
-                } 
-                else if (encoderDelta > 0) {
-                    // Encoder is rotating! 
-                    // We treat rotation as "pressing W". 
-                    // Scaling by encoderDelta makes faster spins go faster.
-                    speed = Math.min(speed + (0.02 * encoderDelta), 0.9);
-                } 
-                else {
-                    // NO ROTATION and NO KEYBOARD: Apply heavy friction to stop "moving by itself"
-                    // This makes the car feel like it has brakes when you stop turning
-                    speed *= 0.92; 
-                    if (speed < 0.01) speed = 0;
-                }
+const encoderActive = throttleBtRef.current.throttle > 0;
+const keyboardActive = (keys['w'] || keys['ArrowUp']);
 
-// Reset the delta so we need fresh rotation for the next frame
-throttleBtRef.current.throttle = 0;
+if (keyboardActive) {
+    speed = Math.min(speed + 0.025, 0.9);
+} 
+else if (encoderActive) {
+    // Every time the encoder clicks, we add to the speed
+    speed = Math.min(speed + 0.05, 0.9);
+    
+    // IMPORTANT: Clear the throttle immediately so one click 
+    // doesn't keep the car moving forever
+    throttleBtRef.current.throttle = 0; 
+} 
+else {
+    // 2. FRICTION: If no input, slow down significantly.
+    // Increase 0.90 to 0.95 if you want it to coast more.
+    // Decrease to 0.85 if you want it to stop faster.
+    speed *= 0.90; 
+    if (speed < 0.01) speed = 0;
+}
 
                     // STEERING (unchanged)
                     steerTarget = 0;
@@ -859,6 +858,7 @@ throttleBtRef.current.throttle = 0;
     </script>
 </body>
 </html>
+
 
 
 
