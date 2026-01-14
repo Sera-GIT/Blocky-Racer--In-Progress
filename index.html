@@ -618,17 +618,28 @@
                     // =========================
                     // Keyboard W/ArrowUp still works the same.
                     // New throttle device provides throttle 0.0..1.0:
-                    const throttle = throttleBtRef.current.throttle || 0.0;
-                    const hasKeyboardForward = (keys['w'] || keys['ArrowUp']);
-                    const hasThrottleForward = (throttle > 0.02);
+               const encoderDelta = throttleBtRef.current.throttle || 0.0;
+                const hasKeyboardForward = (keys['w'] || keys['ArrowUp']);
+                
+                if (hasKeyboardForward) {
+                    // Standard keyboard behavior
+                    speed = Math.min(speed + 0.025, 0.9);
+                } 
+                else if (encoderDelta > 0) {
+                    // Encoder is rotating! 
+                    // We treat rotation as "pressing W". 
+                    // Scaling by encoderDelta makes faster spins go faster.
+                    speed = Math.min(speed + (0.02 * encoderDelta), 0.9);
+                } 
+                else {
+                    // NO ROTATION and NO KEYBOARD: Apply heavy friction to stop "moving by itself"
+                    // This makes the car feel like it has brakes when you stop turning
+                    speed *= 0.92; 
+                    if (speed < 0.01) speed = 0;
+                }
 
-                    if (hasKeyboardForward || hasThrottleForward) {
-                        // Keep your original "feel" but scale acceleration by throttle when using it
-                        const accel = hasKeyboardForward ? 0.025 : (0.030 * throttle);
-                        speed = Math.min(speed + accel, 0.9);
-                    } else {
-                        speed = Math.max(speed - 0.01, 0);
-                    }
+// Reset the delta so we need fresh rotation for the next frame
+throttleBtRef.current.throttle = 0;
 
                     // STEERING (unchanged)
                     steerTarget = 0;
@@ -848,5 +859,6 @@
     </script>
 </body>
 </html>
+
 
 
