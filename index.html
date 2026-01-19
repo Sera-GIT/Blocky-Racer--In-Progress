@@ -618,22 +618,25 @@
                     // =========================
                     // Keyboard W/ArrowUp still works the same.
                     // New throttle device provides throttle 0.0..1.0:
-const throttleValue = throttleBtRef.current.throttle; // 1.0 when rotating, 0.0 when stopped
+// =========================
+// FORWARD MOVEMENT (ULTRA RESPONSIVE)
+// =========================
+const throttleValue = throttleBtRef.current.throttle; // 1.0 or 0.0 from encoder
 const keyboardActive = (keys['w'] || keys['ArrowUp']);
 
 if (keyboardActive) {
-    // Keyboard - gradual acceleration
+    // Keyboard - normal acceleration
     speed = Math.min(speed + 0.03, 0.9);
 } 
 else if (throttleValue > 0.5) {
-    // Encoder is rotating - GO FAST!
-    speed = Math.min(speed + 0.05, 0.9);  // Quick acceleration
+    // Encoder active - INSTANT MAX SPEED
+    speed = 0.9;  // Jump straight to max speed
 } 
 else {
-    // Encoder stopped - INSTANT STOP!
-    speed = 0;
+    // Stopped - gradual deceleration (feels more natural than instant stop)
+    speed *= 0.85;  // Fast slowdown
+    if (speed < 0.05) speed = 0;
 }
-
                     // STEERING (unchanged)
                     steerTarget = 0;
                     const tiltValue = btRef.current.tilt;
@@ -852,6 +855,7 @@ else {
     </script>
 </body>
 </html>
+
 
 
 
