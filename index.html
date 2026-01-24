@@ -8,7 +8,7 @@
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: Arial, sans-serif; }
         #debug-panel {
-            position: fixed; top: 10px; left: 10px; width: 340px;
+            position: fixed; top: 10px; left: 10px; width: 280px;
             background: rgba(0,0,0,0.95); color: #0f0; 
             padding: 15px; border: 2px solid #0f0;
             font-family: monospace; z-index: 10000; font-size: 10px;
@@ -24,27 +24,28 @@
         #loader { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: white; display: flex; justify-content: center; align-items: center; z-index: 999; transition: opacity 0.5s; }
 
         #hud { position: absolute; top: 20px; right: 20px; color: white; text-shadow: 2px 2px 4px #000; z-index: 10; pointer-events: none; text-align: right; }
+        #difficulty-display { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); color: white; text-shadow: 2px 2px 4px #000; z-index: 10; pointer-events: none; font-size: 20px; font-weight: bold; text-align: center; }
         #lives { position: absolute; bottom: 20px; left: 20px; color: white; text-shadow: 2px 2px 4px #000; z-index: 10; pointer-events: none; font-size: 32px; font-weight: bold; }
         #menuBtn { position: absolute; bottom: 20px; right: 20px; background: rgba(0,0,0,0.6); color: white; border: 2px solid white; padding: 10px 20px; font-size: 18px; font-weight: bold; cursor: pointer; z-index: 20; border-radius: 5px; pointer-events: auto; }
-        #sideMenu { position: absolute; top: 0; right: -350px; width: 300px; height: 100%; background: rgba(0,0,0,0.95); color: white; z-index: 100; padding: 30px; box-sizing: border-box; transition: right 0.3s ease-out; display: flex; flex-direction: column; border-left: 2px solid #444; }
+        #sideMenu { position: absolute; top: 0; right: -350px; width: 300px; height: 100%; background: rgba(0,0,0,0.95); color: white; z-index: 100; padding: 30px; box-sizing: border-box; transition: right 0.3s ease-out; display: flex; flex-direction: column; border-left: 2px solid #444; overflow-y: auto; }
         #sideMenu.open { right: 0; }
         .menu-opt { margin: 10px 0; padding: 15px; background: #333; cursor: pointer; border: 1px solid #555; text-align: center; border-radius: 5px; transition: all 0.2s; }
         .menu-opt.active { background: #4CAF50; border-color: #81C784; font-weight: bold; }
-       #overlayScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.3); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 50; color: white; }
+        #overlayScreen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.15); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 50; color: white; }
         .big-btn { padding: 20px 60px; font-size: 32px; background: #4CAF50; color: white; border: none; border-radius: 10px; cursor: pointer; margin-top: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
         .bt-btn { padding: 15px 40px; font-size: 20px; background: #2196F3; color: white; border: none; border-radius: 30px; cursor: pointer; margin-top: 20px; display: flex; align-items: center; gap: 10px; }
         .bt-btn.connected { background: #4CAF50; cursor: default; }
         .bt-btn.connecting { background: #FF9800; }
         .restart-btn { padding: 15px 40px; font-size: 24px; background: #FF9800; color: white; border: none; border-radius: 10px; cursor: pointer; margin-top: 15px; box-shadow: 0 3px 10px rgba(0,0,0,0.5); }
-       .test-btn { background: #f00; color: white; border: none; padding: 10px; width: 100%; margin-top: 5px; cursor: pointer; font-weight: bold; font-size: 11px; border-radius: 3px; }
+        .test-btn { background: #f00; color: white; border: none; padding: 10px; width: 100%; margin-top: 5px; cursor: pointer; font-weight: bold; font-size: 11px; border-radius: 3px; }
         .test-btn:active { background: #c00; }
-        .test-btn.secondary { background: #ff9800; }
-        .test-btn.secondary:active { background: #e68900; }
         .test-btn.tertiary { background: #2196F3; }
         .test-btn.tertiary:active { background: #1976D2; }
         .test-btn.calib { background: #9C27B0; }
         .test-btn.calib:active { background: #7B1FA2; }
         .reset-score-btn { padding: 10px 30px; font-size: 16px; background: #f44336; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; }
+        .menu-section { margin: 20px 0; }
+        .menu-section h3 { font-size: 16px; color: #aaa; margin-bottom: 10px; }
 
     </style>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -54,1565 +55,806 @@
 </head>
 <body>
 
-    <div id="debug-panel">
+    <!-- AUDIO ELEMENTS -->
+    <audio id="song1" loop>
+        <source src="song1.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="song2" loop>
+        <source src="song2.mp3" type="audio/mpeg">
+    </audio>
 
+    <div id="debug-panel">
         <div><b>BLE STATUS:</b> <span id="st" class="status-disconnected">DISCONNECTED</span></div>
-        <div><b>TILT VALUE:</b> <span id="tx">0.00</span></div>
         <div><b>STEERING:</b> <span id="act">CENTER</span></div>
         <hr style="border-color:#0f0;">
         <div><b>THROTTLE BLE:</b> <span id="thst" class="status-disconnected">DISCONNECTED</span></div>
-        <div><b>THROTTLE:</b> <span id="thv">0.00</span></div>
         <button id="reconnectThrottleBtn" class="test-btn tertiary" style="margin-top:8px;">🔄 RECONNECT THROTTLE</button>
         <hr style="border-color:#0f0;">
-        <div style="font-size:11px;"><b>VIBRATION:</b></div>
-        <div><b>Status:</b> <span id="vibeStatus">Ready</span></div>
-        <div><b>Last:</b> <span id="lastError" style="font-size:9px;">None</span></div>
-
         <button id="calibBtn" class="test-btn calib">📍 CALIBRATE</button>
         <button id="reconnectBtn" class="test-btn tertiary" style="margin-top:8px;">🔄 RECONNECT</button>
-
     </div>
-
-
 
     <div id="loader">Loading Assets...</div>
 
     <div id="root"></div>
 
-
-
     <script type="text/babel">
 
         const { useEffect, useRef, useState } = React;
 
-
-
         window.updateDebug = (status, x, action) => {
-
             const stEl = document.getElementById('st');
-
             if(status && stEl) {
-
                 stEl.innerText = status;
-
                 stEl.className = status === 'CONNECTED' ? 'status-connected' : 
-
                                  status === 'CONNECTING...' ? 'status-connecting' : 
-
                                  'status-disconnected';
-
             }
-
-            if(x !== null && x !== undefined) {
-
-                const txEl = document.getElementById('tx');
-
-                if(txEl) txEl.innerText = x.toFixed(2);
-
-            }
-
             if(action) {
-
                 const actEl = document.getElementById('act');
-
                 if(actEl) actEl.innerText = action;
-
             }
-
         };
-
-
-
-        // NEW: throttle debug updater
 
         window.updateThrottleDebug = (status, throttleVal) => {
-
             const stEl = document.getElementById('thst');
-
             if (status && stEl) {
-
                 stEl.innerText = status;
-
                 stEl.className = status === 'CONNECTED' ? 'status-connected' :
-
                                  status === 'CONNECTING...' ? 'status-connecting' :
-
                                  'status-disconnected';
-
             }
-
-            if (throttleVal !== null && throttleVal !== undefined) {
-
-                const thEl = document.getElementById('thv');
-
-                if (thEl) thEl.innerText = throttleVal.toFixed(2);
-
-            }
-
         };
 
-
-
         const BlockyCarGame = () => {
-
             const mountRef = useRef(null);
-
             const [gameStarted, setGameStarted] = useState(false);
-
             const [gameOver, setGameOver] = useState(false);
-
             const [score, setScore] = useState(0);
-
             const [highScore, setHighScore] = useState(0);
-
             const [lives, setLives] = useState(3);
-
             const [newRecord, setNewRecord] = useState(false);
-
             const [menuOpen, setMenuOpen] = useState(false);
-
             const [uiDifficulty, setUiDifficulty] = useState('Progressive');
-
+            const [currentDifficultyText, setCurrentDifficultyText] = useState('容易');
             const [btConnected, setBtConnected] = useState(false);
-
             const [btConnecting, setBtConnecting] = useState(false);
-
-
-
-            // NEW: throttle BT UI states
-
             const [thBtConnected, setThBtConnected] = useState(false);
-
             const [thBtConnecting, setThBtConnecting] = useState(false);
-
-
+            const [selectedSong, setSelectedSong] = useState('song1');
+            const [isMuted, setIsMuted] = useState(false);
 
             const vibeTimeoutRef = useRef(null);
-
-            const vibeCountRef = useRef(0);
-
-
-
-            // NEW: throttle packet count
-
-            const throttlePacketCountRef = useRef(0);
-
+            const audioRef = useRef(null);
             
-
             const btRef = useRef({ 
-
                 device: null, 
-
                 server: null, 
-
                 sensorChar: null, 
-
                 vibeChar: null,
-
                 buttonChar: null,
-
                 tilt: 0,
-
                 isConnecting: false 
-
             });
-
-
-
-            // NEW: throttle device ref
 
             const throttleBtRef = useRef({
-
                 device: null,
-
                 server: null,
-
                 throttleChar: null,
-
                 throttle: 0.0,
-
                 isConnecting: false
-
             });
-
             
-
             const gameStateRef = useRef({
-
                 isGameOver: false, isPaused: false, score: 0, lives: 3,
-
                 movingTime: 0, totalDistance: 0, gridRows: [], opponents: [], difficulty: 'Progressive',
-
                 gameStarted: false, playerCarRef: null
-
             });
-
-
-
-            // Existing controller (tilt/vibe/button)
 
             const SERVICE_UUID = "19b10000-e8f2-537e-4f6c-d104768a1214";
-
             const SENSOR_CHAR_UUID = "19b10001-e8f2-537e-4f6c-d104768a1214";
-
             const VIBE_CHAR_UUID = "19b10002-e8f2-537e-4f6c-d104768a1214";
-
             const BUTTON_CHAR_UUID = "19b10003-e8f2-537e-4f6c-d104768a1214";
 
-
-
-            // NEW throttle service (separate ESP32-C3)
-
             const THROTTLE_SERVICE_UUID = "19b20000-e8f2-537e-4f6c-d104768a1214";
-
             const THROTTLE_CHAR_UUID    = "19b20001-e8f2-537e-4f6c-d104768a1214";
 
-
-
             useEffect(() => {
-
                 const saved = localStorage.getItem('blockyRacerHighScore');
-
                 if (saved) setHighScore(parseInt(saved));
 
+                // Initialize audio - reference HTML audio elements
+                audioRef.current = document.getElementById('song1');
+                audioRef.current.volume = 0.5;
             }, []);
 
-
-
-            const updateVibeStatus = (status, isSuccess) => {
-
-                const statusEl = document.getElementById('vibeStatus');
-
-                if (statusEl) {
-
-                    statusEl.innerText = status;
-
-                    statusEl.className = isSuccess ? 'vibe-success' : 'vibe-fail';
-
+            useEffect(() => {
+                // Stop all songs
+                document.getElementById('song1').pause();
+                document.getElementById('song2').pause();
+                
+                // Set current audio reference
+                audioRef.current = document.getElementById(selectedSong);
+                audioRef.current.volume = 0.5;
+                
+                if (gameStarted && !isMuted) {
+                    audioRef.current.play().catch(e => console.log('Audio play failed:', e));
                 }
+            }, [selectedSong]);
 
-            };
-
-
-
-            const updateLastError = (error) => {
-
-                const errorEl = document.getElementById('lastError');
-
-                if (errorEl) errorEl.innerText = error;
-
-            };
-
-
+            useEffect(() => {
+                if (audioRef.current) {
+                    if (isMuted || !gameStarted) {
+                        audioRef.current.pause();
+                    } else {
+                        audioRef.current.play().catch(e => console.log('Audio play failed:', e));
+                    }
+                }
+            }, [isMuted, gameStarted]);
 
             const onDisconnected = () => {
-
                 console.log("⚠️ DEVICE DISCONNECTED");
-
                 setBtConnected(false);
-
                 setBtConnecting(false);
-
                 
-
                 if (btRef.current) {
-
                     btRef.current.tilt = 0;
-
                     btRef.current.device = null;
-
                     btRef.current.server = null;
-
                     btRef.current.sensorChar = null;
-
                     btRef.current.vibeChar = null;
-
                     btRef.current.buttonChar = null;
-
                     btRef.current.isConnecting = false;
-
                 }
-
                 
-
                 window.updateDebug("DISCONNECTED", 0, "---");
-
-                updateVibeStatus("Disconnected", false);
-
             };
-
-
-
-            // NEW: throttle disconnect handler
 
             const onThrottleDisconnected = () => {
-
                 console.log("⚠️ THROTTLE DEVICE DISCONNECTED");
-
                 setThBtConnected(false);
-
                 setThBtConnecting(false);
 
-
-
                 if (throttleBtRef.current) {
-
                     throttleBtRef.current.throttle = 0.0;
-
                     throttleBtRef.current.device = null;
-
                     throttleBtRef.current.server = null;
-
                     throttleBtRef.current.throttleChar = null;
-
                     throttleBtRef.current.isConnecting = false;
-
                 }
-
-
 
                 window.updateThrottleDebug("DISCONNECTED", 0.0);
-
             };
-
-
 
             const connectBluetooth = async (isReconnect = false) => {
-
                 if (btRef.current.isConnecting) {
-
                     console.log("⏸️ Connection in progress");
-
                     return;
-
                 }
-
-
 
                 try {
-
                     btRef.current.isConnecting = true;
-
                     setBtConnecting(true);
-
                     window.updateDebug("CONNECTING...", null, null);
-
                     
-
                     const device = isReconnect && btRef.current.device ? 
-
                         btRef.current.device : 
-
                         await navigator.bluetooth.requestDevice({
-
                             filters: [{ services: [SERVICE_UUID] }],
-
                             optionalServices: [SERVICE_UUID]
-
                         });
-
                     
-
                     console.log("✓ Device:", device.name);
-
                     device.addEventListener('gattserverdisconnected', onDisconnected);
-
                     
-
                     const server = await device.gatt.connect();
-
                     await new Promise(resolve => setTimeout(resolve, 200));
-
                     
-
                     const service = await server.getPrimaryService(SERVICE_UUID);
-
                     
-
                     const sensorChar = await service.getCharacteristic(SENSOR_CHAR_UUID);
-
                     await sensorChar.startNotifications();
-
                     
-
                     sensorChar.addEventListener('characteristicvaluechanged', (event) => {
-
                         try {
-
                             const val = event.target.value.getFloat32(0, true);
-
                             
-
                             if (!isNaN(val) && isFinite(val)) {
-
                                 btRef.current.tilt = val;
-
                                 
-
                                 let action = "CENTER";
-
                                 if (val >= 2.8) action = "RIGHT ➡️";
-
                                 else if (val <= -2.8) action = "LEFT ⬅️";
-
                                 
-
                                 window.updateDebug(null, val, action);
-
                             }
-
                         } catch (err) {
-
                             console.error("Sensor data error:", err);
-
                         }
-
                     });
-
                     
-
                     const vibeChar = await service.getCharacteristic(VIBE_CHAR_UUID);
-
                     
-
                     const buttonChar = await service.getCharacteristic(BUTTON_CHAR_UUID);
-
                     await buttonChar.startNotifications();
-
                     
-
                     buttonChar.addEventListener('characteristicvaluechanged', (event) => {
-
                         const val = event.target.value.getUint8(0);
-
                         if (val === 1) {
-
                             console.log("🔘 Button pressed - simulating SPACE!");
-
                             const spaceEvent = new KeyboardEvent('keydown', {
-
                                 code: 'Space',
-
                                 key: ' ',
-
                                 keyCode: 32,
-
                                 bubbles: true
-
                             });
-
                             window.dispatchEvent(spaceEvent);
-
                         }
-
                     });
-
                     
-
                     btRef.current = { 
-
                         device, 
-
                         server, 
-
                         sensorChar, 
-
                         vibeChar,
-
                         buttonChar,
-
                         tilt: 0,
-
                         isConnecting: false
-
                     };
-
                     
-
                     setBtConnected(true);
-
                     setBtConnecting(false);
-
                     window.updateDebug("CONNECTED", 0, "CENTER");
-
-                    updateVibeStatus("Ready", true);
-
                     
-
                     console.log("✅ Connected!");
-
                     
-
                 } catch (error) {
-
                     console.error("❌ Connection error:", error);
-
                     btRef.current.isConnecting = false;
-
                     setBtConnecting(false);
-
                     setBtConnected(false);
-
                     window.updateDebug("ERROR", null, null);
-
-                    updateLastError(error.message);
-
                     alert(`Connection Failed: ${error.message}`);
-
                 }
-
             };
 
-
-
-            // NEW: connect throttle BLE device (separate ESP32-C3)
-
             const connectThrottleBluetooth = async (isReconnect = false) => {
-
                 if (throttleBtRef.current.isConnecting) {
-
                     console.log("⏸️ Throttle connection in progress");
-
                     return;
-
                 }
 
-
-
                 try {
-
                     throttleBtRef.current.isConnecting = true;
-
                     setThBtConnecting(true);
-
                     window.updateThrottleDebug("CONNECTING...", null);
 
-
-
                     const device = isReconnect && throttleBtRef.current.device ?
-
                         throttleBtRef.current.device :
-
                         await navigator.bluetooth.requestDevice({
-
                             filters: [{ services: [THROTTLE_SERVICE_UUID] }],
-
                             optionalServices: [THROTTLE_SERVICE_UUID]
-
                         });
 
-
-
                     console.log("✓ Throttle Device:", device.name);
-
                     device.addEventListener('gattserverdisconnected', onThrottleDisconnected);
 
-
-
                     const server = await device.gatt.connect();
-
                     await new Promise(resolve => setTimeout(resolve, 200));
 
-
-
                     const service = await server.getPrimaryService(THROTTLE_SERVICE_UUID);
-
                     const throttleChar = await service.getCharacteristic(THROTTLE_CHAR_UUID);
-
-
 
                     await throttleChar.startNotifications();
 
-
-
                     throttleChar.addEventListener('characteristicvaluechanged', (event) => {
-
                         try {
-
-                            const val = event.target.value.getFloat32(0, true); // 0.0 .. 1.0
-
+                            const val = event.target.value.getFloat32(0, true);
                             if (!isNaN(val) && isFinite(val)) {
-
                                 const clamped = Math.max(0, Math.min(1, val));
-
                                 throttleBtRef.current.throttle = clamped;
-
                                 window.updateThrottleDebug(null, clamped);
-
                             }
-
                         } catch (err) {
-
                             console.error("Throttle data error:", err);
-
                         }
-
                     });
 
-
-
                     throttleBtRef.current = {
-
                         device,
-
                         server,
-
                         throttleChar,
-
                         throttle: 0.0,
-
                         isConnecting: false
-
                     };
 
-
-
                     setThBtConnected(true);
-
                     setThBtConnecting(false);
-
                     window.updateThrottleDebug("CONNECTED", 0.0);
-
-
 
                     console.log("✅ Throttle connected!");
 
-
-
                 } catch (error) {
-
                     console.error("❌ Throttle connection error:", error);
-
                     throttleBtRef.current.isConnecting = false;
-
                     setThBtConnecting(false);
-
                     setThBtConnected(false);
-
                     window.updateThrottleDebug("ERROR", null);
-
                     alert(`Throttle Connection Failed: ${error.message}`);
-
                 }
-
             };
-
-
 
             const sendCalibration = async () => {
-
                 if (!btRef.current.vibeChar) {
-
                     alert("Not connected!");
-
                     return;
-
                 }
-
                 
-
                 try {
-
-                    const data = new Uint8Array([67]); // 'C'
-
+                    const data = new Uint8Array([67]);
                     await btRef.current.vibeChar.writeValueWithoutResponse(data);
-
                     console.log("✅ Calibration sent");
-
-                    updateVibeStatus("Calibrating...", true);
-
                 } catch (err) {
-
                     console.error("❌ Calibration failed:", err);
-
-                    updateVibeStatus("FAIL: " + err.message, false);
-
                 }
-
             };
-
-
 
             const sendVibration = async (fromCrash = false, duration = 400) => {
-
                 if (!btRef.current.vibeChar) {
-
                     console.error("❌ Not connected");
-
                     return;
-
                 }
-
                 
-
                 if (!fromCrash && vibeTimeoutRef.current) {
-
                     return;
-
                 }
-
                 
-
                 try {
-
                     const data = new Uint8Array([1]);
-
                     await btRef.current.vibeChar.writeValueWithoutResponse(data);
-
                     console.log(`✅ Vibe sent (${duration}ms)`);
-
                     
-
-                    updateVibeStatus("Sent!", true);
-
-                    vibeCountRef.current++;
-
-                    updateLastError("None");
-
-                    
-
                     if (!fromCrash) {
-
                         vibeTimeoutRef.current = setTimeout(() => {
-
                             vibeTimeoutRef.current = null;
-
                         }, 1000);
-
                     }
-
                     
-
                 } catch (err) {
-
                     console.error("❌ Vibe failed:", err);
-
-                    updateVibeStatus("FAIL: " + err.message, false);
-
-                    updateLastError(err.message);
-
                 }
-
             };
-
-
 
             const resetHighScore = () => {
-
                 if (confirm("Reset high score to 0?")) {
-
                     localStorage.setItem('blockyRacerHighScore', '0');
-
                     setHighScore(0);
-
                     alert("High score reset!");
-
                 }
-
             };
-
-
-
-            // NEW: Flash animation for player car
 
             const flashPlayerCar = (playerCar) => {
-
-                let flashCount = 0;
-
-                const flashInterval = setInterval(() => {
-
-                    playerCar.visible = !playerCar.visible;
-
-                    flashCount++;
-
-                    if (flashCount >= 8) { // Flash 4 times (8 toggles)
-
-                        clearInterval(flashInterval);
-
-                        playerCar.visible = true;
-
-                    }
-
-                }, 100); // Toggle every 100ms
-
+                playerCar.visible = false;
+                setTimeout(() => {
+                    playerCar.visible = true;
+                }, 200);
             };
 
-
-
             useEffect(() => {
-
                 const calibBtn = document.getElementById('calibBtn');
-
                 const reconnectBtn = document.getElementById('reconnectBtn');
-
                 const reconnectThrottleBtn = document.getElementById('reconnectThrottleBtn');
-
                 
-
                 if (calibBtn) calibBtn.onclick = sendCalibration;
-
                 if (reconnectBtn) reconnectBtn.onclick = () => connectBluetooth(false);
-
                 if (reconnectThrottleBtn) reconnectThrottleBtn.onclick = () => connectThrottleBluetooth(false);
-
                 
-
                 const handleKeyPress = (e) => {
-
                     if (e.code === 'Space' && gameStateRef.current.isGameOver) {
-
                         e.preventDefault();
-
                         triggerRestart();
-
                     }
-
                 };
-
                 
-
                 window.addEventListener('keydown', handleKeyPress);
-
                 return () => window.removeEventListener('keydown', handleKeyPress);
-
             }, []);
-
-
 
             const toggleMenu = () => { 
-
                 if (gameOver || !gameStarted) return; 
-
                 setMenuOpen(!menuOpen); 
-
                 gameStateRef.current.isPaused = !menuOpen; 
-
             };
-
             
-
             const changeDifficulty = (mode) => { 
-
                 gameStateRef.current.difficulty = mode; 
-
                 setUiDifficulty(mode); 
-
+                
+                if (mode === 'Easy') setCurrentDifficultyText('容易');
+                else if (mode === 'Medium') setCurrentDifficultyText('中等难度');
+                else if (mode === 'Hard') setCurrentDifficultyText('高难度');
             };
-
             
-
             const triggerRestart = () => {
-
                 console.log("🔄 Restarting...");
-
                 
-
                 setGameOver(false); 
-
                 setScore(0); 
-
                 setLives(3);
-
                 setNewRecord(false); 
-
                 setMenuOpen(false); 
-
                 setGameStarted(true);
-
                 
-
                 const ref = gameStateRef.current;
-
                 ref.isGameOver = false; 
-
                 ref.isPaused = false; 
-
                 ref.score = 0; 
-
                 ref.lives = 3;
-
                 ref.movingTime = 0; 
-
                 ref.totalDistance = 0;
-
                 ref.gameStarted = true;
-
                 
-
                 ref.opponents.forEach(o => { 
-
                     if(o.mesh && o.mesh.parent) o.mesh.parent.remove(o.mesh); 
-
                 });
-
                 ref.opponents = [];
-
                 
-
                 for (let i = 0; i < ref.gridRows.length; i++) {
-
                     ref.gridRows[i].z = -350 + (i * 30);
-
                     updateRowVisuals(ref.gridRows[i], true); 
-
                 }
 
+                if (audioRef.current && !isMuted) {
+                    audioRef.current.play().catch(e => console.log('Audio play failed:', e));
+                }
             };
-
-
 
             const updateRowVisuals = (rowObj, isRural) => {
-
                 rowObj.treeOuterL.visible = isRural; rowObj.treeOuterR.visible = isRural;
-
                 rowObj.treeInnerL.visible = false; rowObj.treeInnerR.visible = false;
-
                 rowObj.buildL.visible = false; rowObj.buildR.visible = false;
-
                 if (isRural) {
-
                     rowObj.treeInnerL.visible = Math.random() > 0.5; rowObj.treeInnerR.visible = Math.random() > 0.5;
-
                     if (Math.random() > 0.8) { setBuildingType(rowObj.buildL, 'house'); rowObj.buildL.visible = true; rowObj.treeInnerL.visible = false; }
-
                     if (Math.random() > 0.8) { setBuildingType(rowObj.buildR, 'house'); rowObj.buildR.visible = true; rowObj.treeInnerR.visible = false; }
-
                 } else {
-
                     setBuildingType(rowObj.buildL, 'random'); rowObj.buildL.visible = true;
-
                     setBuildingType(rowObj.buildR, 'random'); rowObj.buildR.visible = true;
-
                 }
-
             };
-
             
-
             const setBuildingType = (group, type) => {
-
                 group.children.forEach(c => c.visible = false);
-
                 let idx = 0;
-
                 if (type === 'house') idx = 0;
-
                 else { const r = Math.random(); if (r < 0.25) idx = 0; else if (r < 0.5) idx = 1; else if (r < 0.75) idx = 2; else idx = 3; }
-
                 group.children[idx].visible = true;
-
             };
-
-
 
             useEffect(() => {
-
                 if (!mountRef.current) return;
-
                 const scene = new THREE.Scene();
-
                 scene.background = new THREE.Color(0x87CEEB);
-
                 scene.fog = new THREE.Fog(0xaaccff, 10, 280); 
-
                 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-
                 const renderer = new THREE.WebGLRenderer({ antialias: true });
-
                 renderer.setSize(window.innerWidth, window.innerHeight);
-
                 renderer.shadowMap.enabled = true;
-
                 renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
-
                 mountRef.current.appendChild(renderer.domElement);
 
-
-
                 new THREE.TextureLoader().load('https://images.unsplash.com/photo-1513002749550-c59d786b8e6c?q=80&w=2560&auto=format&fit=crop', 
-
                     (t) => { scene.background = t; const l = document.getElementById('loader'); if(l) { l.style.opacity = 0; setTimeout(() => l.style.display = 'none', 500); } });
 
-
-
                 const ambientLight = new THREE.AmbientLight(0xffffff, 0.6); scene.add(ambientLight);
-
                 const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-
                 dirLight.position.set(100, 150, 50); dirLight.castShadow = true;
-
                 dirLight.shadow.mapSize.width = 4096; dirLight.shadow.mapSize.height = 4096;
-
                 dirLight.shadow.camera.left = -200; dirLight.shadow.camera.right = 200;
-
                 dirLight.shadow.camera.top = 200; dirLight.shadow.camera.bottom = -200;
-
                 scene.add(dirLight);
 
-
-
                 const createMultiBuilding=()=>{const g=new THREE.Group();const c=[0xE6E6FA,0xF5DEB3,0xFFB6C1,0x87CEFA,0x98FB98,0xD3D3D3][Math.floor(Math.random()*6)];const wm=new THREE.MeshLambertMaterial({color:0x333333});const dm=new THREE.MeshLambertMaterial({color:0x4A3627});const rm=new THREE.MeshLambertMaterial({color:0x8B4513});const h=new THREE.Group();const hw=new THREE.Mesh(new THREE.BoxGeometry(12,10,12),new THREE.MeshLambertMaterial({color:c}));hw.position.y=5;hw.castShadow=true;h.add(hw);const hr=new THREE.Mesh(new THREE.ConeGeometry(9,6,4),rm);hr.position.y=13;hr.rotation.y=Math.PI/4;h.add(hr);h.add(new THREE.Mesh(new THREE.BoxGeometry(3,6,0.5),dm).translateY(3).translateZ(6));h.add(new THREE.Mesh(new THREE.BoxGeometry(2.5,2.5,0.5),wm).translateY(6).translateX(-3.5).translateZ(6));h.add(new THREE.Mesh(new THREE.BoxGeometry(2.5,2.5,0.5),wm).translateY(6).translateX(3.5).translateZ(6));h.add(new THREE.Mesh(new THREE.BoxGeometry(2,4,2),new THREE.MeshLambertMaterial({color:0x555555})).translateY(13).translateX(3).translateZ(-3));g.add(h);const s=new THREE.Group();const sw=new THREE.Mesh(new THREE.BoxGeometry(14,45,14),new THREE.MeshLambertMaterial({color:0xaaaaaa}));sw.position.y=22.5;sw.castShadow=true;s.add(sw);for(let i=0;i<6;i++){const w=new THREE.Group();const wn=new THREE.Mesh(new THREE.BoxGeometry(3,4,0.5),wm);w.add(wn.clone().translateX(-4));w.add(wn.clone().translateX(4));w.position.set(0,5+i*6,7);s.add(w);}s.visible=false;g.add(s);const f=new THREE.Group();const fw=new THREE.Mesh(new THREE.BoxGeometry(18,12,18),new THREE.MeshLambertMaterial({color:0xCD5C5C}));fw.position.y=6;fw.castShadow=true;f.add(fw);f.add(new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,10,12),new THREE.MeshLambertMaterial({color:0x333333})).translateY(15).translateX(-5).translateZ(-5));f.add(new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,10,12),new THREE.MeshLambertMaterial({color:0x333333})).translateY(15).translateX(5));f.visible=false;g.add(f);const gl=new THREE.Group();const gw=new THREE.Mesh(new THREE.BoxGeometry(15,30,15),new THREE.MeshLambertMaterial({color:0x00CED1,transparent:true,opacity:0.8}));gw.position.y=15;gw.castShadow=true;gl.add(gw);for(let i=1;i<5;i++)gl.add(new THREE.Mesh(new THREE.BoxGeometry(14.5,0.5,14.5),new THREE.MeshLambertMaterial({color:0xffffff})).translateY(i*6));gl.visible=false;g.add(gl);return g;};
-
                 const createTree=()=>{const g=new THREE.Group();const t=Math.random();if(t<0.3){g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.7,2.5,6),new THREE.MeshLambertMaterial({color:0x3d2817})).translateY(1.25));const l=new THREE.Mesh(new THREE.ConeGeometry(3,7,8),new THREE.MeshLambertMaterial({color:0x1a472a}));l.position.y=5;l.castShadow=true;g.add(l);}else if(t<0.6){g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.6,3.5,6),new THREE.MeshLambertMaterial({color:0x5C4033})).translateY(1.75));const c=[0xFFB7C5,0xFF69B4,0xFFA500,0xFFFF00][Math.floor(Math.random()*4)];const l=new THREE.Mesh(new THREE.DodecahedronGeometry(2.8),new THREE.MeshLambertMaterial({color:c}));l.position.y=4.5;l.castShadow=true;g.add(l);}else{g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.6,0.7,3,6),new THREE.MeshLambertMaterial({color:0x8B4513})).translateY(1.5));const l=new THREE.Mesh(new THREE.SphereGeometry(3,7,7),new THREE.MeshLambertMaterial({color:0x228B22}));l.position.y=4;l.castShadow=true;g.add(l);}g.scale.set(1.3,1.3,1.3);return g;};
-
                 
-
-                const createCar=(t,c)=>{const g=new THREE.Group();const p=new THREE.MeshLambertMaterial({color:c});const gl=new THREE.MeshLambertMaterial({color:0x222222});const r=new THREE.MeshLambertMaterial({color:0x111111});const m=new THREE.MeshLambertMaterial({color:0x888888});const lr=new THREE.MeshLambertMaterial({color:0xff0000});const ly=new THREE.MeshLambertMaterial({color:0xffff00});const mb=(w,h,d,mt,x,y,z,rx=0)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mt);o.position.set(x,y,z);if(rx)o.rotation.x=rx;o.castShadow=true;g.add(o);};const mr=(rad,len,mt,x,y,z)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,len,16,1,false,0,Math.PI),mt);o.rotation.set(Math.PI/2,0,Math.PI/2);o.position.set(x,y,z);o.castShadow=true;g.add(o);};const ml=(mt,x,y,z)=>{const o=new THREE.Mesh(new THREE.SphereGeometry(0.2,8,8),mt);o.position.set(x,y,z);g.add(o);};const by=0.8;const wg=new THREE.CylinderGeometry(0.6,0.6,0.5,16);[[-1.2,1.2],[1.2,1.2],[-1.2,-1.2],[1.2,-1.2]].forEach(p=>{const w=new THREE.Mesh(wg,r);w.rotation.z=Math.PI/2;w.position.set(p[0],0.6,p[1]);w.castShadow=true;g.add(w);});if(t==='sport'){mb(2.4,0.8,4.2,p,0,by,0);mr(1.1,2.2,p,0,by+0.4,-0.3);mb(2.0,0.1,1.0,gl,0,by+0.65,0.6,-Math.PI/6);mb(2.4,0.2,0.6,p,0,by+0.7,-1.8);ml(ly,-0.8,by,2.2);ml(ly,0.8,by,2.2);ml(lr,-0.8,by+0.1,-2.2);ml(lr,0.8,by+0.1,-2.2);}else if(t==='ambulance'){const white=new THREE.MeshLambertMaterial({color:0xffffff});mb(2.4,1.2,1.5,white,0,by+0.2,-1.7);mr(1.2,1.5,white,0,by+0.8,-1.7);mb(2.1,0.6,0.1,gl,0,by+0.9,-2.35,-Math.PI/12);mb(2.5,2.5,3.2,white,0,by+0.85,0.7);const red=new THREE.MeshLambertMaterial({color:0xff0000});mb(0.5,1.8,0.1,red,0,by+0.85,2.35);mb(1.8,0.5,0.1,red,0,by+0.85,2.35);ml(ly,-0.9,by,-2.4);ml(ly,0.9,by,-2.4);ml(lr,-0.9,by+0.1,2.4);ml(lr,0.9,by+0.1,2.4);}else if(t==='van'){mb(2.4,1.2,1.5,p,0,by+0.2,-1.7);mr(1.2,1.5,p,0,by+0.8,-1.7);mb(2.1,0.6,0.1,gl,0,by+0.9,-2.35,-Math.PI/12);mb(2.5,2.5,3.2,p,0,by+0.85,0.7);ml(ly,-0.9,by,-2.4);ml(ly,0.9,by,-2.4);ml(lr,-0.9,by+0.1,2.4);ml(lr,0.9,by+0.1,2.4);}else{const co=t==='police'?new THREE.MeshLambertMaterial({color:0x2196F3}):p;mb(2.4,1.0,4.0,co,0,by,0);mr(1.2,2.5,co,0,by+0.5,-0.2);mb(2.1,0.5,0.8,gl,0,by+0.6,0.6,-Math.PI/8);ml(ly,-0.8,by,2.1);ml(ly,0.8,by,2.1);ml(lr,-0.8,by+0.1,-2.1);ml(lr,0.8,by+0.1,-2.1);if(t==='police'){const b=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.15,0.25),m);b.position.set(0,by+1.75,-0.2);const rl=new THREE.Mesh(new THREE.SphereGeometry(0.2),lr);rl.position.x=-0.4;b.add(rl);const bl=new THREE.Mesh(new THREE.SphereGeometry(0.2),new THREE.MeshLambertMaterial({color:0x0000ff}));bl.position.x=0.4;b.add(bl);g.add(b);}}g.scale.set(1.4,1.4,1.4);return g;};
-
-
+                const createCar=(t,c)=>{const g=new THREE.Group();const p=new THREE.MeshLambertMaterial({color:c});const gl=new THREE.MeshLambertMaterial({color:0x222222});const r=new THREE.MeshLambertMaterial({color:0x111111});const m=new THREE.MeshLambertMaterial({color:0x888888});const lr=new THREE.MeshLambertMaterial({color:0xff0000});const ly=new THREE.MeshLambertMaterial({color:0xffff00});const mb=(w,h,d,mt,x,y,z,rx=0)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mt);o.position.set(x,y,z);if(rx)o.rotation.x=rx;o.castShadow=true;g.add(o);};const mr=(rad,len,mt,x,y,z)=>{const o=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,len,16,1,false,0,Math.PI),mt);o.rotation.set(Math.PI/2,0,Math.PI/2);o.position.set(x,y,z);o.castShadow=true;g.add(o);};const ml=(mt,x,y,z)=>{const o=new THREE.Mesh(new THREE.SphereGeometry(0.2,8,8),mt);o.position.set(x,y,z);g.add(o);};const by=0.8;const wg=new THREE.CylinderGeometry(0.6,0.6,0.5,16);[[-1.2,1.2],[1.2,1.2],[-1.2,-1.2],[1.2,-1.2]].forEach(p=>{const w=new THREE.Mesh(wg,r);w.rotation.z=Math.PI/2;w.position.set(p[0],0.6,p[1]);w.castShadow=true;g.add(w);});if(t==='sport'){mb(2.4,0.8,4.2,p,0,by,0);mr(1.1,2.2,p,0,by+0.4,-0.3);mb(2.0,0.1,1.0,gl,0,by+0.65,0.6,-Math.PI/6);mb(2.4,0.2,0.6,p,0,by+0.7,-1.8);ml(ly,-0.8,by,2.2);ml(ly,0.8,by,2.2);ml(lr,-0.8,by+0.1,-2.2);ml(lr,0.8,by+0.1,-2.2);}else if(t==='ambulance'){const white=new THREE.MeshLambertMaterial({color:0xffffff});mb(2.4,1.2,1.5,white,0,by+0.2,-1.7);mr(1.2,1.5,white,0,by+0.8,-1.7);mb(2.1,0.6,0.1,gl,0,by+0.9,-2.35,-Math.PI/12);mb(2.5,2.5,3.2,white,0,by+0.85,0.7);const red=new THREE.MeshLambertMaterial({color:0xff0000});mb(0.5,1.8,0.1,red,0,by+0.85,2.35);mb(1.8,0.5,0.1,red,0,by+0.85,2.35);ml(ly,-0.9,by,-2.4);ml(ly,0.9,by,-2.4);ml(lr,-0.9,by+0.1,2.4);ml(lr,0.9,by+0.1,2.4);}else if(t==='van'){mb(2.4,1.2,1.5,p,0,by+0.2,-1.7);mr(1.2,1.5,p,0,by+0.8,-1.7);mb(2.1,0.6,0.1,gl,0,by+0.9,-2.35,-Math.PI/12);mb(2.5,2.5,3.2,p,0,by+0.85,0.7);ml(ly,-0.9,by,-2.4);ml(ly,0.9,by,-2.4);ml(lr,-0.9,by+0.1,2.4);ml(lr,0.9,by+0.1,2.4);}else{const co=t==='police'?new THREE.MeshLambertMaterial({color:0x2196F3}):p;mb(2.4,1.0,4.0,co,0,by,0);mr(1.2,2.5,co,0,by+0.5,-0.2);mb(2.1,0.5,0.8,gl,0,by+0.6,0.6,-Math.PI/8);ml(ly,-0.8,by,2.1);ml(ly,0.8,by,2.1);ml(lr,-0.8,by+0.1,-2.1);ml(lr,0.8,by+0.1,-2.1);if(t==='police'){const b=new THREE.Mesh(new THREE.BoxGeometry(1.2,0.15,0.25),m);b.position.set(0,by+1.75,-0.2);const rl=new THREE.Mesh(new THREE.SphereGeometry(0.2),lr);rl.position.x=-0.4;b.add(rl);const bl=new THREE.Mesh(new THREE.SphereGeometry(0.2),new THREE.MeshLambertMaterial({color:0x0000ff}));bl.position.x=0.4;b.add(bl);g.add(b);}}g.scale.set(1.7,1.7,1.7);return g;};
 
                 const playerCar = createCar('sport', 0xFF0055); 
-
                 scene.add(playerCar);
-
-                gameStateRef.current.playerCarRef = playerCar; // Store reference
-
+                gameStateRef.current.playerCarRef = playerCar;
                 
-
                 const road = new THREE.Mesh(new THREE.PlaneGeometry(30, 1000), new THREE.MeshLambertMaterial({ color: 0x444444 }));
-
                 road.rotation.x = -Math.PI / 2; road.receiveShadow = true; scene.add(road);
-
                 const grassL = new THREE.Mesh(new THREE.BoxGeometry(250, 1, 1000), new THREE.MeshLambertMaterial({ color: 0x2d5a27 })); grassL.position.set(-140, -0.6, 0); scene.add(grassL);
-
                 const grassR = new THREE.Mesh(new THREE.BoxGeometry(250, 1, 1000), new THREE.MeshLambertMaterial({ color: 0x2d5a27 })); grassR.position.set(140, -0.6, 0); scene.add(grassR);
-
                 const markings = new THREE.Group(); for(let i=-20; i<80; i++) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.1, 4), new THREE.MeshBasicMaterial({ color: 0xFFFFFF })); m.position.set(-5, 0.05, i*10); markings.add(m.clone()); m.position.set(5, 0.05, i*10); markings.add(m); } scene.add(markings);
 
-
-
                 const GRID_STEP = 30; const NUM_ROWS = 40; const START_Z = -350;
-
                 for (let i = 0; i < NUM_ROWS; i++) {
-
                     const z = START_Z + (i * GRID_STEP);
-
                     const tL = createTree(); tL.position.set(-20, 0, 0); const tR = createTree(); tR.position.set(20, 0, 0);
-
                     const tOL = createTree(); tOL.position.set(-55, 0, 0); const tOR = createTree(); tOR.position.set(55, 0, 0);
-
                     const bL = createMultiBuilding(); bL.position.set(-35, 0, 0); const bR = createMultiBuilding(); bR.position.set(35, 0, 0);
-
                     const rowG = new THREE.Group(); rowG.position.z = z; rowG.add(tL, tR, tOL, tOR, bL, bR); scene.add(rowG);
-
                     const rowObj = { mesh: rowG, z: z, treeInnerL: tL, treeInnerR: tR, treeOuterL: tOL, treeOuterR: tOR, buildL: bL, buildR: bR };
-
                     updateRowVisuals(rowObj, true); gameStateRef.current.gridRows.push(rowObj);
-
                 }
 
-
-
                 const keys = {}; const onKey = (e) => keys[e.key] = e.type === 'keydown';
-
                 window.addEventListener('keydown', onKey); window.addEventListener('keyup', onKey);
-
                 camera.position.set(0, 10, 35); let speed = 0; let spawnTimer = 0; let currentRot = 0, currentTilt = 0; const LANES = [-10, 0, 10]; let steerCurrent = 0; let steerTarget = 0;
 
-
-
                 const animate = () => {
-
                     requestAnimationFrame(animate);
-
                     if (!gameStateRef.current.gameStarted || gameStateRef.current.isGameOver || gameStateRef.current.isPaused) {
-
                         if(gameStateRef.current.gameStarted) renderer.render(scene, camera); 
-
                         return;
-
                     }
-
-
 
                     if (speed > 0) { gameStateRef.current.movingTime += 0.016; gameStateRef.current.totalDistance += speed; }
-
                     const t = gameStateRef.current.movingTime; const diffMode = gameStateRef.current.difficulty;
 
-
-
                     let laneSwitchProb = 0, spawnRate = 80, laneChangeDistance = 80;
-
+                    let currentDiffText = '容易';
+                    
                     if (diffMode === 'Progressive') {
-
-                        if (t > 30 && t <= 60) { laneSwitchProb=0.002; spawnRate=60; laneChangeDistance=100; }
-
-                        else if (t > 60) { laneSwitchProb=0.008; spawnRate=55; laneChangeDistance=120; }
-
+                        if (t > 30 && t <= 60) { 
+                            laneSwitchProb=0.002; spawnRate=60; laneChangeDistance=100;
+                            currentDiffText = '中等难度';
+                        }
+                        else if (t > 60) { 
+                            laneSwitchProb=0.008; spawnRate=55; laneChangeDistance=120;
+                            currentDiffText = '高难度';
+                        }
+                        setCurrentDifficultyText(currentDiffText);
                     } else {
-
-                        if (diffMode === 'Medium') { laneSwitchProb=0.002; spawnRate=60; laneChangeDistance=100; }
-
-                        else if (diffMode === 'Hard') { laneSwitchProb=0.008; spawnRate=55; laneChangeDistance=120; }
-
+                        if (diffMode === 'Easy') currentDiffText = '容易';
+                        else if (diffMode === 'Medium') { laneSwitchProb=0.002; spawnRate=60; laneChangeDistance=100; currentDiffText = '中等难度'; }
+                        else if (diffMode === 'Hard') { laneSwitchProb=0.008; spawnRate=55; laneChangeDistance=120; currentDiffText = '高难度'; }
                     }
-
-
 
                     const throttleValue = throttleBtRef.current.throttle;
-
                     const keyboardActive = (keys['w'] || keys['ArrowUp']);
 
-
-
                     if (keyboardActive) {
-
                         speed = Math.min(speed + 0.03, 0.9);
-
                     } 
-
                     else if (throttleValue > 0.5) {
-
                         speed = 0.9;
-
                     } 
-
                     else {
-
                         speed *= 0.85;
-
                         if (speed < 0.05) speed = 0;
-
                     }
-
-
 
                     steerTarget = 0;
-
                     const tiltValue = btRef.current.tilt;
 
-
-
                     if (keys['a'] || keys['ArrowLeft']) {
-
                         steerTarget = -0.3;
-
                     } 
-
                     else if (keys['d'] || keys['ArrowRight']) {
-
                         steerTarget = 0.3;
-
                     } 
-
                     else if (tiltValue <= -2.8) {
-
                         steerTarget = -0.3;
-
                     } 
-
                     else if (tiltValue >= 2.8) {
-
                         steerTarget = 0.3;
-
                     }
-
                     
-
                     const STEER_SMOOTH = 0.15;
-
                     steerCurrent += (steerTarget - steerCurrent) * STEER_SMOOTH;
-
                     if (Math.abs(steerCurrent) < 0.02) steerCurrent = 0;
 
-
-
                     if ((playerCar.position.x > -13 && steerCurrent < 0) || 
-
                         (playerCar.position.x < 13 && steerCurrent > 0)) {
-
                         playerCar.position.x += steerCurrent;
-
                     }
-
                     
-
                     playerCar.position.x = Math.max(-13, Math.min(13, playerCar.position.x));
-
                     
-
                     const tr = -steerCurrent * 0.3;
-
                     const tt = -steerCurrent * 0.15;
-
                     currentRot += (tr-currentRot)*0.1; 
-
                     currentTilt += (tt-currentTilt)*0.1;
-
                     playerCar.rotation.y = currentRot; 
-
                     playerCar.rotation.z = currentTilt;
-
                     
-
                     camera.position.x = playerCar.position.x * 0.6; 
-
                     camera.lookAt(playerCar.position.x * 0.3, 2, -50);
 
-
-
                     if(speed > 0) {
-
                         gameStateRef.current.score += 1; setScore(Math.floor(gameStateRef.current.score));
-
                         markings.position.z = (markings.position.z + speed) % 40;
-
                         const isRural = Math.floor(gameStateRef.current.totalDistance / 400) % 2 === 0;
-
                         let minZ = 10000; gameStateRef.current.gridRows.forEach(r => minZ = Math.min(minZ, r.z));
-
                         gameStateRef.current.gridRows.forEach(row => {
-
                             row.z += speed; if (row.z > 80) { row.z = minZ - GRID_STEP; minZ = row.z; updateRowVisuals(row, isRural); }
-
                             row.mesh.position.z = row.z;
-
                         });
-
                     }
-
-
 
                     const trafficSpeed = 0.6 + speed; spawnTimer += trafficSpeed;
-
                     if(spawnTimer > spawnRate) { 
-
                         spawnTimer = 0; 
-
                         const r = Math.random(); 
-
                         let type = 'sedan'; 
-
                         let col = 0x555555;
-
                         
-
                         if(r<0.15) type='police'; 
-
                         else if(r<0.25) { type='ambulance'; }
-
                         else if(r<0.40) { type='van'; col=[0xAA0000, 0x0000AA, 0x228B22][Math.floor(Math.random()*3)]; }
-
                         else if(r<0.55) { type='sport'; col=0x00FF00; } 
-
                         else col = [0xAA0000, 0x0000AA, 0x228B22, 0xFF8C00, 0x8A2BE2, 0x00FFFF][Math.floor(Math.random()*6)];
-
                         
-
                         const c = createCar(type, col); 
-
                         c.position.set(LANES[Math.floor(Math.random()*3)], 0, -250); 
-
                         c.rotation.y = Math.PI;
-
                         scene.add(c); 
-
                         gameStateRef.current.opponents.push({ mesh: c, laneIdx: Math.floor(Math.random()*3) });
-
                     }
-
                     
-
                     const ops = gameStateRef.current.opponents;
-
                     for (let i = ops.length - 1; i >= 0; i--) {
-
                         const opp = ops[i]; 
-
                         opp.mesh.position.z += trafficSpeed;
-
                         
-
                         const distanceFromPlayer = opp.mesh.position.z - playerCar.position.z;
-
                         if (laneSwitchProb > 0 && Math.random() < laneSwitchProb && distanceFromPlayer < -laneChangeDistance) {
-
                              const next = opp.laneIdx + (Math.random()>0.5?1:-1); 
-
                              if(next>=0 && next<=2) opp.laneIdx = next;
-
                         }
-
                         
-
                         const targetX = LANES[opp.laneIdx]; 
-
                         const dx = targetX - opp.mesh.position.x;
-
                         if(Math.abs(dx) > 0.1) { 
-
                             opp.mesh.position.x += dx * 0.03; 
-
                             opp.mesh.rotation.y = Math.PI + (dx>0?-0.1:0.1); 
-
                         } else opp.mesh.rotation.y = Math.PI;
-
                         
-
                         const distanceZ = Math.abs(opp.mesh.position.z - playerCar.position.z);
-
                         const distanceX = Math.abs(opp.mesh.position.x - playerCar.position.x);
-
                         
-
-                        if (distanceZ < 4.0 && distanceX < 3.0) {
-
+                        if (distanceZ < 5.0 && distanceX < 4.5) {
                             console.log("💥 HIT!");
-
                             
-
                             gameStateRef.current.lives--;
-
                             setLives(gameStateRef.current.lives);
-
                             
-
-                            // Flash player car instead of removing enemy
-
                             flashPlayerCar(playerCar);
-
                             
-
                             if (gameStateRef.current.lives <= 0) {
-
                                 console.log("💀 GAME OVER!");
-
                                 sendVibration(true, 800);
-
                                 setGameOver(true); 
-
                                 gameStateRef.current.isGameOver = true; 
-
                                 
-
                                 const h = localStorage.getItem('blockyRacerHighScore') ? parseInt(localStorage.getItem('blockyRacerHighScore')) : 0;
-
                                 if (gameStateRef.current.score > h) { 
-
                                     localStorage.setItem('blockyRacerHighScore', gameStateRef.current.score); 
-
                                     setHighScore(gameStateRef.current.score); 
-
                                     setNewRecord(true); 
-
                                 } else {
-
                                     setNewRecord(false);
-
                                 }
-
                             } else {
-
                                 sendVibration(true, 400);
-
                             }
-
                             
-
-                            // Remove enemy car
-
                             scene.remove(opp.mesh); 
-
                             ops.splice(i, 1);
-
                         }
-
                         
-
                         if(opp.mesh.position.z > 80) { scene.remove(opp.mesh); ops.splice(i, 1); }
-
                     }
-
                     renderer.render(scene, camera);
-
                 };
-
                 animate();
 
-
-
                 const handleResize = () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); };
-
                 window.addEventListener('resize', handleResize);
-
                 return () => { window.removeEventListener('resize', handleResize); window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKey); if(mountRef.current) mountRef.current.innerHTML = ''; };
-
             }, []);
 
-
-
             const onStartGame = () => { 
-
                 setGameStarted(true); 
-
                 gameStateRef.current.gameStarted = true; 
-
-                gameStateRef.current.isPaused = false; 
-
+                gameStateRef.current.isPaused = false;
+                
+                if (audioRef.current && !isMuted) {
+                    audioRef.current.play().catch(e => console.log('Audio play failed:', e));
+                }
             };
-
             
-
             const onPlayAgain = () => { 
-
                 triggerRestart(); 
-
             };
-
-
 
             return (
-
                 <div style={{width:'100vw', height:'100vh', position:'relative', overflow:'hidden'}}>
-
                     
-
                     <div ref={mountRef} style={{width:'100%', height:'100%'}} />
-
                     
-
                     {gameStarted && !gameOver && (
-
                     <>
-
+                        <div id="difficulty-display">{currentDifficultyText}</div>
                         <div id="hud">
-
                             <div style={{fontSize: 32, fontWeight: 'bold'}}>Score: {score}</div>
-
                             <div style={{fontSize: 32, fontWeight: 'bold', color: '#FFFF00', marginTop: 5}}>High Score: {highScore}</div>
-
-                            <div style={{fontSize: 18, color: '#000000', marginTop: 10, fontWeight: 'bold', textShadow: '1px 1px 0 #fff'}}>Difficulty 难度: {uiDifficulty}</div>
-
                         </div>
-
                         <div id="lives">
-
                             <span style={{color: lives >= 1 ? '#ff0000' : '#666'}}>❤</span>
-
                             <span style={{color: lives >= 2 ? '#ff0000' : '#666'}}>❤</span>
-
                             <span style={{color: lives >= 3 ? '#ff0000' : '#666'}}>❤</span>
-
                         </div>
-
                     </>
-
                     )}
-
-
 
                     {gameStarted && !gameOver && <div id="menuBtn" onClick={toggleMenu}>MENU</div>}
-
                     
-
                     <div id="sideMenu" className={menuOpen ? 'open' : ''}>
-
                         <h2 style={{textAlign:'center', borderBottom:'1px solid #666', paddingBottom:'10px'}}>PAUSED</h2>
-
-                        <div style={{marginBottom:'20px'}}>
-
-                            <h3 style={{fontSize:'16px', color:'#aaa'}}>Difficulty Mode 难度模式</h3>
-
+                        
+                        <div className="menu-section">
+                            <h3>Difficulty Mode 难度模式</h3>
                             <div className={`menu-opt ${uiDifficulty==='Progressive'?'active':''}`} onClick={()=>changeDifficulty('Progressive')}>Progressive 渐进式</div>
-
-                            <div className={`menu-opt ${uiDifficulty==='Easy'?'active':''}`} onClick={()=>changeDifficulty('Easy')}>Fixed: Easy 简单</div>
-
-                            <div className={`menu-opt ${uiDifficulty==='Medium'?'active':''}`} onClick={()=>changeDifficulty('Medium')}>Fixed: Medium 中等</div>
-
-                            <div className={`menu-opt ${uiDifficulty==='Hard'?'active':''}`} onClick={()=>changeDifficulty('Hard')}>Fixed: Hard 困难</div>
-
+                            <div className={`menu-opt ${uiDifficulty==='Easy'?'active':''}`} onClick={()=>changeDifficulty('Easy')}>Easy 容易</div>
+                            <div className={`menu-opt ${uiDifficulty==='Medium'?'active':''}`} onClick={()=>changeDifficulty('Medium')}>Medium 中等难度</div>
+                            <div className={`menu-opt ${uiDifficulty==='Hard'?'active':''}`} onClick={()=>changeDifficulty('Hard')}>Hard 高难度</div>
                         </div>
 
+                        <div className="menu-section">
+                            <h3>Music 音乐</h3>
+                            <div className={`menu-opt ${selectedSong==='song1'?'active':''}`} onClick={()=>setSelectedSong('song1')}>Song 1</div>
+                            <div className={`menu-opt ${selectedSong==='song2'?'active':''}`} onClick={()=>setSelectedSong('song2')}>Song 2</div>
+                            <div className={`menu-opt ${isMuted?'active':''}`} onClick={()=>setIsMuted(!isMuted)}>{isMuted ? '🔇 : '🔊}</div>
+                        </div>
+                        
                         <div className="menu-opt" style={{background:'#2196F3', marginTop:'auto'}} onClick={toggleMenu}>RESUME GAME</div>
-
                     </div>
-
                     
-
                     {!gameStarted && (
-
                         <div id="overlayScreen">
-
                             <h1 style={{fontSize:'80px', margin:0, color:'#4CAF50', textShadow:'4px 4px 0 #000'}}>BLOCKY RACER</h1>
-
                             <p style={{marginTop:'20px', fontSize:'18px'}}>High Score: {highScore}</p>
-
                             <button className="reset-score-btn" onClick={resetHighScore}>Reset High Score 重置最高分</button>
 
-
-
                             <button 
-
                                 className={`bt-btn ${btConnected?'connected':btConnecting?'connecting':''}`} 
-
                                 onClick={!btConnected && !btConnecting ? connectBluetooth : null}
-
                                 disabled={btConnecting}
-
                             >
-
                                 {btConnected ? '✅ STEERING CONTROLLER PAIRED' : btConnecting ? '🔄 CONNECTING...' : '📡 PAIR STEERING CONTROLLER'}
-
                             </button>
-
-
 
                             <button 
-
                                 className={`bt-btn ${thBtConnected?'connected':thBtConnecting?'connecting':''}`} 
-
                                 onClick={!thBtConnected && !thBtConnecting ? connectThrottleBluetooth : null}
-
                                 disabled={thBtConnecting}
-
                             >
-
                                 {thBtConnected ? '✅ THROTTLE PAIRED' : thBtConnecting ? '🔄 CONNECTING...' : '🌀 PAIR THROTTLE (ENCODER)'}
-
                             </button>
 
-
-
-                            <button className="big-btn" onClick={onStartGame}>START ENGINE 启动引擎</button>
-
+                            <button className="big-btn" onClick={onStartGame}>START 开始</button>
                         </div>
-
                     )}
-
                     
-
                     {gameOver && (
-
                         <div id="overlayScreen">
-
                             <h1 style={{color:'#ff4444', fontSize:'80px', margin:0}}>CRASHED! 撞车了!</h1>
-
                             <p style={{fontSize:'32px'}}>Score: {score}</p>
-
                             {newRecord && <div style={{background:'#FFD700', color:'black', padding:'10px 20px', borderRadius:'5px', fontWeight:'bold', fontSize:'20px', marginBottom:'20px'}}>🏆 NEW HIGH SCORE! 🏆</div>}
-
                             <p style={{fontSize:'18px', color:'#aaa'}}>Press SPACE or button to restart</p>
-
                             <button className="big-btn" onClick={onPlayAgain}>PLAY AGAIN 再玩一次</button>
-
                             <button className="restart-btn" onClick={()=>{setGameStarted(false); setGameOver(false); setScore(0); setLives(3);}}>MAIN MENU</button>
-
                         </div>
-
                     )}
-
                 </div>
-
             );
-
         };
-
         const root = ReactDOM.createRoot(document.getElementById('root'));
-
         root.render(<BlockyCarGame />);
-
     </script>
-
 </body>
-
 </html>
