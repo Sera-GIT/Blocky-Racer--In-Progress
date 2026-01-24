@@ -533,14 +533,6 @@
 
             useEffect(() => {
                 if (!mountRef.current) return;
-                const hideLoader = () => {
-                    const l = document.getElementById('loader');
-                    if(l) { 
-                        l.style.opacity = 0; 
-                        setTimeout(() => l.style.display = 'none', 500); 
-                    }
-                };
-                const loaderTimeout = setTimeout(hideLoader, 2000);
                 const scene = new THREE.Scene();
                 scene.background = new THREE.Color(0x87CEEB);
                 scene.fog = new THREE.Fog(0xaaccff, 10, 280); 
@@ -550,11 +542,11 @@
                 renderer.shadowMap.enabled = true;
                 renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
                 mountRef.current.appendChild(renderer.domElement);
-
-                setTimeout(() => {
-                    const l = document.getElementById('loader');
-                    if(l) { l.style.opacity = 0; setTimeout(() => l.style.display = 'none', 500); }
-                }, 3000);
+                const loaderEl = document.getElementById('loader');
+                if(loaderEl) {
+                    loaderEl.style.opacity = 0;
+                    setTimeout(() => loaderEl.style.display = 'none', 500);
+                }
                 
                 // Try to load background image (optional, won't block game)
                 new THREE.TextureLoader().load('https://images.unsplash.com/photo-1513002749550-c59d786b8e6c?q=80&w=2560&auto=format&fit=crop', 
@@ -872,6 +864,7 @@
     </script>
 </body>
 </html>
+
 
 
 
