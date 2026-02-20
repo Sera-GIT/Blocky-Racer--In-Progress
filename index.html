@@ -506,17 +506,20 @@
             const [btConnecting, setBtConnecting] = useState(false);
             const [thBtConnected, setThBtConnected] = useState(false);
             const [thBtConnecting, setThBtConnecting] = useState(false);
+            const [autoConnecting, setAutoConnecting] = useState(false);
             const [calibrated, setCalibrated] = useState(false);
 
             // Translations
             const translations = {
-                en: { score: 'Score', highScore: 'High Score', difficulty: 'Difficulty', paused: 'PAUSED', settings: 'Settings', volume: 'Volume', sensitivity: 'Pedal Sensitivity', difficultyMode: 'Difficulty Mode', progressive: 'Easy', dynamic: 'Dynamic', easy: 'Easy', medium: 'Medium', hard: 'Hard', challenging: 'Challenging', impossible: 'IMPOSSIBLE', resume: 'RESUME GAME', title: 'CAR ADVENTURE', resetScore: 'Reset High Score', pairSteering: 'PAIR STEERING CONTROLLER', pairThrottle: 'PAIR THROTTLE (ENCODER)', connecting: 'CONNECTING...', paired: 'PAIRED', startEngine: 'START ENGINE', crashed: 'CRASHED!', newRecord: 'NEW HIGH SCORE!', pressRestart: 'Press SPACE or button to restart', playAgain: 'PLAY AGAIN', mainMenu: 'MAIN MENU', language: 'Language', menu: 'MENU', fixed: 'Fixed' },
-                zh: { score: '分数', highScore: '最高分', difficulty: '难度', paused: '暂停', settings: '设置', volume: '音量', sensitivity: '踏板灵敏度', difficultyMode: '难度模式', progressive: '简单', dynamic: '动态', easy: '简单', medium: '中等', hard: '困难', challenging: '挑战', impossible: '不可能', resume: '继续游戏', title: '汽车冒险', resetScore: '重置最高分', pairSteering: '配对方向盘', pairThrottle: '配对油门', connecting: '连接中...', paired: '已配对', startEngine: '开始游戏', crashed: '撞车了！', newRecord: '新纪录！', pressRestart: '按空格键或按钮重新开始', playAgain: '再玩一次', mainMenu: '主菜单', language: '语言', menu: '设置', fixed: '固定' },
-                ms: { score: 'Skor', highScore: 'Skor Tertinggi', difficulty: 'Kesukaran', paused: 'DIJEDA', settings: 'Tetapan', volume: 'Kelantangan', sensitivity: 'Sensitiviti Pedal', difficultyMode: 'Mod Kesukaran', progressive: 'Mudah', dynamic: 'Dinamik', easy: 'Mudah', medium: 'Sederhana', hard: 'Sukar', challenging: 'Mencabar', impossible: 'MUSTAHIL', resume: 'SAMBUNG PERMAINAN', title: 'CAR ADVENTURE', resetScore: 'Set Semula Skor', pairSteering: 'PAIR STERENG', pairThrottle: 'PAIR THROTTLE', connecting: 'MENYAMBUNG...', paired: 'DIPASANGKAN', startEngine: 'MULA ENJIN', crashed: 'TERLANGGAR!', newRecord: 'SKOR TERTINGGI BARU!', pressRestart: 'Tekan SPACE atau butang untuk mula semula', playAgain: 'MAIN LAGI', mainMenu: 'MENU UTAMA', language: 'Bahasa', menu: 'MENU', fixed: 'Tetap' },
-                hi: { score: 'स्कोर', highScore: 'उच्च स्कोर', difficulty: 'कठिनाई', paused: 'रुका हुआ', settings: 'सेटिंग्स', volume: 'आवाज़', sensitivity: 'पैडल संवेदनशीलता', difficultyMode: 'कठिनाई मोड', progressive: 'आसान', dynamic: 'गतिशील', easy: 'आसान', medium: 'मध्यम', hard: 'कठिन', challenging: 'चुनौतीपूर्ण', impossible: 'असंभव', resume: 'खेल जारी रखें', title: 'कार एडवेंचर', resetScore: 'स्कोर रीसेट करें', pairSteering: 'स्टीयरिंग जोड़ें', pairThrottle: 'थ्रॉटल जोड़ें', connecting: 'कनेक्ट हो रहा...', paired: 'जुड़ा हुआ', startEngine: 'इंजन चालू करें', crashed: 'टक्कर!', newRecord: 'नया रिकॉर्ड!', pressRestart: 'पुनः आरंभ करने के लिए SPACE दबाएं', playAgain: 'फिर से खेलें', mainMenu: 'मुख्य मेनू', language: 'भाषा', menu: 'मेनू', fixed: 'स्थिर' }
+                en: { score: 'Score', highScore: 'High Score', difficulty: 'Difficulty', paused: 'PAUSED', settings: 'Settings', volume: 'Volume', sensitivity: 'Pedal Sensitivity', difficultyMode: 'Difficulty Mode', progressive: 'Easy', dynamic: 'Dynamic', easy: 'Easy', medium: 'Medium', hard: 'Hard', challenging: 'Challenging', impossible: 'IMPOSSIBLE', resume: 'RESUME GAME', title: 'CAR ADVENTURE', resetScore: 'Reset High Score', pairSteering: 'PAIR STEERING CONTROLLER', pairThrottle: 'PAIR THROTTLE (ENCODER)', connecting: 'CONNECTING...', paired: 'PAIRED', startEngine: 'START ENGINE', crashed: 'CRASHED!', newRecord: 'NEW HIGH SCORE!', pressRestart: 'Press SPACE or button to restart', playAgain: 'PLAY AGAIN', mainMenu: 'MAIN MENU', language: 'Language', menu: 'MENU', fixed: 'Fixed', autoConnect: '✨ AUTO CONNECT ALL', autoConnectConfirm: 'No auto-connectable devices found. Pair both devices sequentially?' },
+                zh: { score: '分数', highScore: '最高分', difficulty: '难度', paused: '暂停', settings: '设置', volume: '音量', sensitivity: '踏板灵敏度', difficultyMode: '难度模式', progressive: '简单', dynamic: '动态', easy: '简单', medium: '中等', hard: '困难', challenging: '挑战', impossible: '不可能', resume: '继续游戏', title: '汽车冒险', resetScore: '重置最高分', pairSteering: '配对方向盘', pairThrottle: '配对油门', connecting: '连接中...', paired: '已配对', startEngine: '开始游戏', crashed: '撞车了！', newRecord: '新纪录！', pressRestart: '按空格键或按钮重新开始', playAgain: '再玩一次', mainMenu: '主菜单', language: '语言', menu: '设置', fixed: '固定', autoConnect: '✨ 自动连接所有', autoConnectConfirm: '未找到可自动连接的设备。是否依次手动配对这两个设备？' },
+                ms: { score: 'Skor', highScore: 'Skor Tertinggi', difficulty: 'Kesukaran', paused: 'DIJEDA', settings: 'Tetapan', volume: 'Kelantangan', sensitivity: 'Sensitiviti Pedal', difficultyMode: 'Mod Kesukaran', progressive: 'Mudah', dynamic: 'Dinamik', easy: 'Mudah', medium: 'Sederhana', hard: 'Sukar', challenging: 'Mencabar', impossible: 'MUSTAHIL', resume: 'SAMBUNG PERMAINAN', title: 'CAR ADVENTURE', resetScore: 'Set Semula Skor', pairSteering: 'PAIR STERENG', pairThrottle: 'PAIR THROTTLE', connecting: 'MENYAMBUNG...', paired: 'DIPASANGKAN', startEngine: 'MULA ENJIN', crashed: 'TERLANGGAR!', newRecord: 'SKOR TERTINGGI BARU!', pressRestart: 'Tekan SPACE atau butang untuk mula semula', playAgain: 'MAIN LAGI', mainMenu: 'MENU UTAMA', language: 'Bahasa', menu: 'MENU', fixed: 'Tetap', autoConnect: '✨ SAMBUNG AUTO', autoConnectConfirm: 'Tiada peranti sambungan auto ditemui. Pasangkan kedua-dua peranti secara manual?' },
+                hi: { score: 'स्कोर', highScore: 'उच्च स्कोर', difficulty: 'कठिनाई', paused: 'रुका हुआ', settings: 'सेटिंग्स', volume: 'आवाज़', sensitivity: 'पैडल संवेदनशीलता', difficultyMode: 'कठिनाई मोड', progressive: 'आसान', dynamic: 'गतिशील', easy: 'आसान', medium: 'मध्यम', hard: 'कठिन', challenging: 'चुनौतीपूर्ण', impossible: 'असंभव', resume: 'खेल जारी रखें', title: 'कार एडवेंचर', resetScore: 'स्कोर रीसेट करें', pairSteering: 'स्टीयरिंग जोड़ें', pairThrottle: 'थ्रॉटल जोड़ें', connecting: 'कनेक्ट हो रहा...', paired: 'जुड़ा हुआ', startEngine: 'इंजन चालू करें', crashed: 'टक्कर!', newRecord: 'नया रिकॉर्ड!', pressRestart: 'पुनः आरंभ करने के लिए SPACE दबाएं', playAgain: 'फिर से खेलें', mainMenu: 'मुख्य मेनू', language: 'भाषा', menu: 'मेनू', fixed: 'स्थिर', autoConnect: '✨ ऑटो कनेक्ट', autoConnectConfirm: 'कोई ऑटो-कनेक्ट करने योग्य डिवाइस नहीं मिला। क्या दोनों डिवाइस को अनुक्रमिक रूप से जोड़ा जाए?' }
             };
             const t = (key) => translations[language]?.[key] || translations.en[key] || key;
             const changeLanguage = (lang) => { setLanguage(lang); localStorage.setItem('blockyRacerLang', lang); };
+
+            // ... (omitted lines) ...
 
             const vibeTimeoutRef = useRef(null);
             const packetCountRef = useRef(0);
@@ -558,8 +561,21 @@
                     btRef.current.isConnecting = true; setBtConnecting(true); window.updateDebug("CONNECTING...", null, null);
                     const device = isReconnect && btRef.current.device ? btRef.current.device : await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }], optionalServices: [SERVICE_UUID] });
                     console.log("✓ Device:", device.name); device.addEventListener('gattserverdisconnected', onDisconnected);
-                    const server = await device.gatt.connect(); await new Promise(resolve => setTimeout(resolve, 200));
-                    const service = await server.getPrimaryService(SERVICE_UUID);
+                    let server = null; let service = null;
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        try {
+                            console.log(`GATT connect attempt ${attempt}/3`);
+                            if (!device.gatt.connected) { server = await device.gatt.connect(); } else { server = device.gatt; }
+                            await new Promise(resolve => setTimeout(resolve, 300 * attempt));
+                            service = await server.getPrimaryService(SERVICE_UUID);
+                            break;
+                        } catch (e) {
+                            console.warn(`Attempt ${attempt} failed:`, e.message);
+                            if (attempt === 3) throw e;
+                            try { device.gatt.disconnect(); } catch (_) {}
+                            await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+                        }
+                    }
                     const sensorChar = await service.getCharacteristic(SENSOR_CHAR_UUID); await sensorChar.startNotifications();
                     sensorChar.addEventListener('characteristicvaluechanged', (event) => { try { const raw = event.target.value.getFloat32(0, true); if (!isNaN(raw) && isFinite(raw)) { const val = raw - tiltOffsetRef.current; btRef.current.tilt = val; packetCountRef.current++; const rcvEl = document.getElementById('rcv'); if (rcvEl) rcvEl.innerText = packetCountRef.current; let action = "CENTER"; if (val >= 2.8) action = "RIGHT ➡️"; else if (val <= -2.8) action = "LEFT ⬅️"; window.updateDebug(null, val, action); } } catch (err) { console.error("Sensor data error:", err); } });
                     const vibeChar = await service.getCharacteristic(VIBE_CHAR_UUID);
@@ -599,6 +615,76 @@
                     setThBtConnected(true); setThBtConnecting(false); window.updateThrottleDebug("CONNECTED", 0.0); console.log("✅ Throttle connected!");
                 } catch (error) { console.error("❌ Throttle connection error:", error); throttleBtRef.current.isConnecting = false; setThBtConnecting(false); setThBtConnected(false); window.updateThrottleDebug("ERROR", null); alert(`Throttle Connection Failed: ${error.message}`); }
             };
+
+            const autoConnect = async () => {
+                if (autoConnecting) return;
+                setAutoConnecting(true);
+                let steeringConnected = btRef.current.server != null;
+                let throttleConnected = throttleBtRef.current.server != null;
+
+                if (navigator.bluetooth && navigator.bluetooth.getDevices) {
+                    try {
+                        const devices = await navigator.bluetooth.getDevices();
+                        console.log("Found permitted devices:", devices);
+                        const blockyDevices = devices.filter(d => d.name && d.name.startsWith("BlockyRacer"));
+                        console.log("BlockyRacer devices:", blockyDevices.map(d => d.name));
+
+                        for (const device of blockyDevices) {
+                            if (steeringConnected && throttleConnected) break;
+                            console.log("Attempting auto-connect to:", device.name);
+                            try {
+                                const server = await device.gatt.connect();
+                                console.log("Connected to", device.name);
+
+                                // Try steering first
+                                if (!steeringConnected && !btRef.current.isConnecting) {
+                                    try {
+                                        await server.getPrimaryService(SERVICE_UUID);
+                                        console.log("Identified as Steering Controller");
+                                        btRef.current.device = device;
+                                        await connectBluetooth(true);
+                                        steeringConnected = true;
+                                        continue;
+                                    } catch (e) { /* Not Steering */ }
+                                }
+
+                                // Try throttle
+                                if (!throttleConnected && !throttleBtRef.current.isConnecting) {
+                                    try {
+                                        await server.getPrimaryService(THROTTLE_SERVICE_UUID);
+                                        console.log("Identified as Throttle Controller");
+                                        throttleBtRef.current.device = device;
+                                        await connectThrottleBluetooth(true);
+                                        throttleConnected = true;
+                                        continue;
+                                    } catch (e) { /* Not Throttle */ }
+                                }
+
+                                device.gatt.disconnect();
+                            } catch (err) {
+                                console.log("Failed to connect/identify device:", device.name, err);
+                            }
+                        }
+                    } catch (err) {
+                        console.warn("Auto connect error:", err);
+                    }
+                }
+
+                setAutoConnecting(false);
+
+                // Offer manual pairing for any devices that didn't auto-connect
+                if (!steeringConnected || !throttleConnected) {
+                    const missing = [];
+                    if (!steeringConnected) missing.push(t('pairSteering'));
+                    if (!throttleConnected) missing.push(t('pairThrottle'));
+                    if (confirm(t('autoConnectConfirm'))) {
+                        try {
+                            if (!steeringConnected) await connectBluetooth();
+                            if (!throttleConnected) await connectThrottleBluetooth();
+                        } catch (e) { console.error(e); }
+                    }
+                }
+            };
             // === CALIBRATION & RECONNECT WINDOW FUNCTIONS ===
             window.calibrateTilt = () => {
                 // Software calibration: store offset
@@ -620,7 +706,7 @@
             const sendCalibration = async () => { if (!btRef.current.vibeChar) { alert("Not connected!"); return; } try { const data = new Uint8Array([67]); await btRef.current.vibeChar.writeValueWithoutResponse(data); console.log("✅ Calibration sent"); updateVibeStatus("Calibrating...", true); } catch (err) { console.error("❌ Calibration failed:", err); updateVibeStatus("FAIL: " + err.message, false); } };
             const sendVibration = async (fromCrash = false, duration = 400) => { if (!btRef.current.vibeChar) { console.error("❌ Not connected"); return; } if (!fromCrash && vibeTimeoutRef.current) { return; } try { const data = new Uint8Array([1]); await btRef.current.vibeChar.writeValueWithoutResponse(data); console.log(`✅ Vibe sent (${duration}ms)`); updateVibeStatus("Sent!", true); updateVibeCount(); updateLastError("None"); if (!fromCrash) { vibeTimeoutRef.current = setTimeout(() => { vibeTimeoutRef.current = null; }, 1000); } } catch (err) { console.error("❌ Vibe failed:", err); updateVibeStatus("FAIL: " + err.message, false); updateLastError(err.message); } };
             const resetHighScore = () => { if (confirm("Reset high score to 0?")) { localStorage.setItem('blockyRacerHighScore', '0'); setHighScore(0); alert("High score reset!"); } };
-            useEffect(() => { const calibBtn = document.getElementById('calibBtn'); const testBtn = document.getElementById('testVibeBtn'); const reconnectBtn = document.getElementById('reconnectBtn'); const reconnectThrottleBtn = document.getElementById('reconnectThrottleBtn'); if (calibBtn) calibBtn.onclick = sendCalibration; if (testBtn) testBtn.onclick = () => sendVibration(false); if (reconnectBtn) reconnectBtn.onclick = () => connectBluetooth(false); if (reconnectThrottleBtn) reconnectThrottleBtn.onclick = () => connectThrottleBluetooth(false); const handleKeyPress = (e) => { if (e.code === 'Space' && gameStateRef.current.isGameOver) { e.preventDefault(); triggerRestart(); } }; window.addEventListener('keydown', handleKeyPress); return () => window.removeEventListener('keydown', handleKeyPress); }, []);
+            useEffect(() => { const calibBtn = document.getElementById('calibBtn'); const testBtn = document.getElementById('testVibeBtn'); const reconnectBtn = document.getElementById('reconnectBtn'); const reconnectThrottleBtn = document.getElementById('reconnectThrottleBtn'); const autoConnectBtn = document.getElementById('autoConnectBtn'); if (calibBtn) calibBtn.onclick = sendCalibration; if (testBtn) testBtn.onclick = () => sendVibration(false); if (reconnectBtn) reconnectBtn.onclick = () => connectBluetooth(false); if (reconnectThrottleBtn) reconnectThrottleBtn.onclick = () => connectThrottleBluetooth(false); if (autoConnectBtn) autoConnectBtn.onclick = autoConnect; const handleKeyPress = (e) => { if (e.code === 'Space' && gameStateRef.current.isGameOver) { e.preventDefault(); triggerRestart(); } }; window.addEventListener('keydown', handleKeyPress); return () => window.removeEventListener('keydown', handleKeyPress); }, []);
             const toggleMenu = () => { if (gameOver || !gameStarted) return; setMenuOpen(!menuOpen); gameStateRef.current.isPaused = !menuOpen; };
             const changeDifficulty = (mode) => { gameStateRef.current.difficulty = mode; setUiDifficulty(mode); };
             const triggerRestart = () => { console.log("🔄 Restarting..."); setGameOver(false); setScore(0); setLives(3); setNewRecord(false); setMenuOpen(false); setGameStarted(true); const ref = gameStateRef.current; ref.isGameOver = false; ref.isPaused = false; ref.score = 0; ref.lives = 3; ref.movingTime = 0; ref.totalDistance = 0; ref.gameStarted = true; ref.opponents.forEach(o => { if (o.mesh && o.mesh.parent) o.mesh.parent.remove(o.mesh); }); ref.opponents = []; for (let i = 0; i < ref.gridRows.length; i++) { ref.gridRows[i].z = -350 + (i * 15); ref.gridRows[i].mesh.position.z = ref.gridRows[i].z; ref.gridRows[i].mesh.position.x = 0; ref.gridRows[i].mesh.rotation.y = 0; updateRowVisuals(ref.gridRows[i], true); } };
@@ -1988,9 +2074,8 @@
 
                     // === VISUAL EFFECTS UPDATE ===
                     // Time progression: 1 game hour = 30 real seconds
-                    gameStateRef.current.gameTime += 0.016 / 30;
-                    if (gameStateRef.current.gameTime >= 24) gameStateRef.current.gameTime = 0;
-                    const hour = gameStateRef.current.gameTime;
+                    // Night Mode Disabled
+                    const hour = 12;
 
                     // Update sky, fog, and lighting based on time
                     const skyCol = getSkyColor(hour);
@@ -2131,17 +2216,15 @@
                             laneSwitchProb = 0.03; spawnRate = 30; laneChangeDistance = 60; // Chaos!
                         }
                     } else { if (diffMode === 'Medium') { laneSwitchProb = 0.002; spawnRate = 60; laneChangeDistance = 100; } else if (diffMode === 'Hard') { laneSwitchProb = 0.008; spawnRate = 55; laneChangeDistance = 120; } }
-                    let clicks = throttleBtRef.current.throttle; throttleBtRef.current.throttle = 0;
+                    let bikeSpeed = throttleBtRef.current.throttle;
                     const keyboardActive = (keys['w'] || keys['ArrowUp']);
                     if (keyboardActive) {
                         speed = Math.min(speed + 0.0065, 1.4);
-                    } else if (clicks > 0) {
-                        // Throttle pedal input
-                        let accelAmount = clicks * sensitivityRef.current * 0.23;
-                        speed = Math.min(speed + accelAmount, 1.4);
+                    } else if (bikeSpeed > 0.005) {
+                        speed = Math.min(bikeSpeed * sensitivityRef.current * 0.23, 1.4);
                     } else {
-                        speed *= 0.99;
-                        if (speed < 0.01) speed = 0;
+                        speed *= 0.995;
+                        if (speed < 0.005) speed = 0;
                     }
                     steerTarget = 0; const tiltValue = btRef.current.tilt;
                     if (keys['a'] || keys['ArrowLeft']) { steerTarget = -0.3; } else if (keys['d'] || keys['ArrowRight']) { steerTarget = 0.3; } else if (tiltValue <= -2.8) { steerTarget = -0.3; } else if (tiltValue >= 2.8) { steerTarget = 0.3; }
@@ -2428,8 +2511,8 @@
 
                         <div style={{ marginBottom: '8px' }}>
                             <h3 style={{ fontSize: '14px', color: '#aaa', marginTop: 0, marginBottom: '5px' }}>BLE</h3>
-                            <div className="menu-opt" style={{ background: '#00BCD4', marginTop: '5px', transition: 'all 0.3s ease', cursor: 'pointer' }} onClick={() => { if (window.reconnectSteering) window.reconnectSteering(); }} onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>🔄 Reconnect Steering</div>
-                            <div className="menu-opt" style={{ background: '#00BCD4', marginTop: '5px', transition: 'all 0.3s ease', cursor: 'pointer' }} onClick={() => { if (window.reconnectThrottle) window.reconnectThrottle(); }} onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>🔄 Reconnect Throttle</div>
+                            <div className="menu-opt" style={{ background: btConnected ? '#4CAF50' : btConnecting ? '#FF9800' : '#00BCD4', marginTop: '5px', transition: 'all 0.3s ease', cursor: btConnecting ? 'wait' : 'pointer', opacity: btConnecting ? 0.8 : 1 }} onClick={() => { if (!btConnecting && window.reconnectSteering) window.reconnectSteering(); }} onMouseEnter={(e) => { if (!btConnecting) e.currentTarget.style.transform = 'scale(1.05)'; }} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>{btConnected ? '✅' : btConnecting ? '🔄' : '🔌'} {t('pairSteering')} {btConnected ? `(${t('paired')})` : btConnecting ? `(${t('connecting')})` : ''}</div>
+                            <div className="menu-opt" style={{ background: thBtConnected ? '#4CAF50' : thBtConnecting ? '#FF9800' : '#00BCD4', marginTop: '5px', transition: 'all 0.3s ease', cursor: thBtConnecting ? 'wait' : 'pointer', opacity: thBtConnecting ? 0.8 : 1 }} onClick={() => { if (!thBtConnecting && window.reconnectThrottle) window.reconnectThrottle(); }} onMouseEnter={(e) => { if (!thBtConnecting) e.currentTarget.style.transform = 'scale(1.05)'; }} onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}>{thBtConnected ? '✅' : thBtConnecting ? '🔄' : '🔌'} {t('pairThrottle')} {thBtConnected ? `(${t('paired')})` : thBtConnecting ? `(${t('connecting')})` : ''}</div>
                         </div>
 
                         <div style={{ marginBottom: '8px' }}>
@@ -2443,11 +2526,12 @@
                     </div>
                     {
                         !gameStarted && (<div id="overlayScreen"> <h1 style={{ fontSize: '80px', margin: 0, color: '#4CAF50', textShadow: '4px 4px 0 #000' }}>{t('title')}</h1> <p style={{ marginTop: '20px', fontSize: '18px' }}>{t('highScore')}: {highScore}</p> <button className="reset-score-btn" onClick={resetHighScore}>{t('resetScore')}</button>
+                            <button id="autoConnectBtn" className={`bt-btn ${btConnected && thBtConnected ? 'connected' : autoConnecting ? 'connecting' : ''}`} onClick={autoConnect} disabled={autoConnecting || (btConnected && thBtConnected)} style={{ background: btConnected && thBtConnected ? '#4CAF50' : autoConnecting ? '#FF9800' : '#673AB7', border: `2px solid ${btConnected && thBtConnected ? '#66BB6A' : autoConnecting ? '#FFB74D' : '#9575CD'}`, marginBottom: '15px' }}>{btConnected && thBtConnected ? `✅ ${t('autoConnect')}` : autoConnecting ? `🔄 ${t('connecting')}` : `${t('autoConnect') || "Auto Connect All"}`}</button>
                             <button className={`bt-btn ${btConnected ? 'connected' : btConnecting ? 'connecting' : ''}`} onClick={!btConnected && !btConnecting ? connectBluetooth : null} disabled={btConnecting}> {btConnected ? `✅ ${t('pairSteering')} ${t('paired')}` : btConnecting ? `🔄 ${t('connecting')}` : `📡 ${t('pairSteering')}`} </button>
                             <button className={`bt-btn ${thBtConnected ? 'connected' : thBtConnecting ? 'connecting' : ''}`} onClick={!thBtConnected && !thBtConnecting ? connectThrottleBluetooth : null} disabled={thBtConnecting}> {thBtConnected ? `✅ ${t('pairThrottle')} ${t('paired')}` : thBtConnecting ? `🔄 ${t('connecting')}` : `🌀 ${t('pairThrottle')}`} </button>
                             <button className="big-btn" onClick={onStartGame}>{t('startEngine')}</button> </div>)
                     }
-                    {gameOver && (<div id="overlayScreen"> <h1 style={{ color: '#ff4444', fontSize: '80px', margin: 0 }}>{t('crashed')}</h1> <p style={{ fontSize: '32px' }}>{t('score')}: {score}</p> {newRecord && <div style={{ background: '#FFD700', color: 'black', padding: '10px 20px', borderRadius: '5px', fontWeight: 'bold', fontSize: '20px', marginBottom: '20px' }}>🏆 {t('newRecord')} 🏆</div>} <p style={{ fontSize: '18px', color: '#aaa' }}>{t('pressRestart')}</p> <button className="big-btn" onClick={onPlayAgain}>{t('playAgain')}</button> <div style={{ marginTop: '15px' }}> <button className="restart-btn" onClick={() => { setGameStarted(false); setGameOver(false); setScore(0); setLives(3); }}>{t('mainMenu')}</button> </div> </div>)}
+                    {gameOver && (<div id="overlayScreen"> <h1 style={{ color: '#ff4444', fontSize: '80px', margin: 0 }}>{t('crashed')}</h1> <p style={{ fontSize: '32px' }}>{t('score')}: {score}</p> {newRecord && <div style={{ background: '#FFD700', color: 'black', padding: '10px 20px', borderRadius: '5px', fontWeight: 'bold', fontSize: '20px', marginBottom: '20px' }}>🏆 {t('newRecord')} 🏆</div>} <p style={{ fontSize: '18px', color: '#aaa' }}>{t('pressRestart')}</p> <button className="big-btn" onClick={onPlayAgain}>{t('playAgain')}</button> <div style={{ marginTop: '15px' }}> <button className="restart-btn" onClick={() => { setGameStarted(false); setGameOver(false); setScore(0); setLives(3); setNewRecord(false); setMenuOpen(false); const ref = gameStateRef.current; ref.isGameOver = false; ref.isPaused = false; ref.gameStarted = false; ref.score = 0; ref.lives = 3; ref.movingTime = 0; ref.totalDistance = 0; ref.opponents.forEach(o => { if (o.mesh && o.mesh.parent) o.mesh.parent.remove(o.mesh); }); ref.opponents = []; for (let i = 0; i < ref.gridRows.length; i++) { ref.gridRows[i].z = -350 + (i * 15); ref.gridRows[i].mesh.position.z = ref.gridRows[i].z; ref.gridRows[i].mesh.position.x = 0; ref.gridRows[i].mesh.rotation.y = 0; updateRowVisuals(ref.gridRows[i], true); } stopMusic(); }}>{t('mainMenu')}</button> </div> </div>)}
 
                 </div >
             );
